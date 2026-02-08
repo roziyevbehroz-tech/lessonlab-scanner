@@ -11,34 +11,37 @@
 
 <body>
 
-    <!-- Yuqori qism: Sarlavha va Statistika -->
+    <!-- Yuqori qism -->
     <div class="top-bar">
         <div class="header">
             <h3>📷 LLabQR Scanner</h3>
-            <span id="qcount">Savol: 1/10</span>
+            <span id="qcount">Savol: <span id="current-q">1</span>/10</span>
         </div>
         <div class="stats">
-            <div class="stat-box correct">
-                <span class="emoji">✅</span> <span id="correct-count">0</span>
-            </div>
-            <div class="stat-box wrong">
-                <span class="emoji">❌</span> <span id="wrong-count">0</span>
-            </div>
-            <div class="stat-box total">
-                <span class="emoji">👥</span> <span id="total-scanned">0</span>
-            </div>
+            <div class="stat-box correct">✅ <span id="correct-count">0</span></div>
+            <div class="stat-box wrong">❌ <span id="wrong-count">0</span></div>
+            <div class="stat-box total">👥 <span id="total-scanned">0</span></div>
         </div>
     </div>
 
-    <!-- KAMERA SOZLAMALARI -->
+    <!-- TO'G'RI JAVOBNI TANLASH -->
+    <div class="answer-selector">
+        <span>To'g'ri javob:</span>
+        <button class="ans-btn" data-ans="A">A</button>
+        <button class="ans-btn" data-ans="B">B</button>
+        <button class="ans-btn" data-ans="C">C</button>
+        <button class="ans-btn" data-ans="D">D</button>
+    </div>
+
+    <!-- Kamera sozlamalari -->
     <div class="camera-settings">
         <select id="cameraSelect">
             <option value="">Kamerani tanlang...</option>
         </select>
-        <button id="switchCameraBtn" class="btn small">🔄 Almashtirish</button>
+        <button id="switchCameraBtn" class="btn small">🔄</button>
     </div>
 
-    <!-- Kamera oynasi -->
+    <!-- Kamera -->
     <div class="camera-container">
         <div id="debugConsole"></div>
         <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
@@ -46,15 +49,15 @@
         <div id="loadingMessage">Kamera yuklanmoqda...</div>
     </div>
 
-    <!-- Pastki qism: Natijalar ro'yxati -->
+    <!-- Natijalar -->
     <div class="results-container">
-        <h4>Oxirgi natijalar:</h4>
+        <h4>Natijalar:</h4>
         <ul id="results-list"></ul>
     </div>
 
-    <!-- Boshqaruv tugmalari -->
+    <!-- Tugmalar -->
     <div class="controls">
-        <button id="next-question-btn" class="btn primary">Keyingi savol ➡️</button>
+        <button id="next-question-btn" class="btn primary">Keyingi ➡️</button>
         <button id="finish-test-btn" class="btn danger">Tugatish 🏁</button>
     </div>
 

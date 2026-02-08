@@ -35,7 +35,7 @@ CV.stackBoxBlurMult = [1, 171, 205, 293, 57, 373, 79, 137, 241, 27, 391, 357, 41
 CV.stackBoxBlurShift = [0, 9, 10, 11, 9, 12, 10, 11, 12, 9, 13, 13, 10, 9, 13, 13];
 CV.BlurStack = function () { this.color = 0; this.next = null; };
 CV.stackBoxBlur = function (imageSrc, imageDst, kernelSize) {
-    var src = imageSrc.data, dst = imageDst.data, height = imageSrc.height, width = imageSrc.width, heightMinus1 = height - 1, widthMinus1 = width - 1, size = kernelSize + kernelSize + 1, radius = kernelSize + 1, mult = CV.stackBoxBlurMult[kernelSize], shift = CV.stackBoxBlurShift[kernelSize], stack, stackStart, color, sum, pos, start, p, x, y, i;
+    var src = imageSrc.data, dst = imageDst.data, height = imageSrc.height, width = imageSrc.width, heightMinus1 = height - 1, widthMinus1 = width - 1, size = kernelSize + kernelSize + 1, radius = kernelSize + 1, mult = CV.stackBoxBlurMult[kernelSize], shift = CV.stackBoxBlurShift[kernelSize], stack, stackStart, sum, pos, p, x, y, i;
     imageDst.width = width; imageDst.height = height; imageDst.data = [];
     stack = stackStart = new CV.BlurStack();
     for (i = 1; i < size; ++i) { stack = stack.next = new CV.BlurStack(); } stack.next = stackStart;
@@ -105,7 +105,7 @@ var AR = AR || {};
 AR.Marker = function (id, corners) { this.id = id; this.corners = corners; };
 AR.Detector = function () { this.grey = new CV.Image(); this.thres = new CV.Image(); this.homography = new CV.Image(); this.binary = []; this.contours = []; this.polys = []; this.candidates = []; };
 AR.Detector.prototype.detect = function (image) {
-    CV.grayscale(image, this.grey); CV.adaptiveThreshold(this.grey, this.thres, 2, 7); this.contours = CV.findContours(this.thres, this.binary); this.candidates = this.findCandidates(this.contours, image.width * 0.20, 0.05, 10); this.candidates = this.clockwiseCorners(this.candidates); this.candidates = this.notTooNear(this.candidates, 10); return this.findMarkers(this.grey, this.candidates, 49);
+    CV.grayscale(image, this.grey); CV.adaptiveThreshold(this.grey, this.thres, 2, 7); this.contours = CV.findContours(this.thres, this.binary); this.candidates = this.findCandidates(this.contours, image.width * 0.10, 0.05, 10); this.candidates = this.clockwiseCorners(this.candidates); this.candidates = this.notTooNear(this.candidates, 10); return this.findMarkers(this.grey, this.candidates, 49);
 };
 AR.Detector.prototype.findCandidates = function (contours, minSize, epsilon, minLength) {
     var candidates = [], len = contours.length, contour, poly, i; this.polys = [];
@@ -146,88 +146,108 @@ AR.Detector.prototype.rotate = function (src) { var dst = [], len = src.length, 
 AR.Detector.prototype.rotate2 = function (src, rotation) { var dst = [], len = src.length, i; for (i = 0; i < len; ++i) { dst[i] = src[(rotation + i) % len]; } return dst; };
 
 // ==========================================
-// APP LOGIC (Scanner with Camera Selection)
+// SCANNER APP - TO'LIQ MANTIQ
 // ==========================================
 
 let debugDiv = null;
 let currentStream = null;
 let availableCameras = [];
-let currentCameraIndex = 0;
 
 function log(msg, isError = false) {
     console.log(msg);
-    if (!debugDiv) { debugDiv = document.getElementById("debugConsole"); }
+    if (!debugDiv) debugDiv = document.getElementById("debugConsole");
     if (debugDiv) {
         const color = isError ? "red" : "lime";
-        const time = new Date().toLocaleTimeString();
-        debugDiv.innerHTML += `<div style="color:${color};">[${time}] ${msg}</div>`;
+        debugDiv.innerHTML += `<div style="color:${color};">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
         debugDiv.scrollTop = debugDiv.scrollHeight;
     }
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
     log("Scanner starting...");
-    const tg = window.Telegram.WebApp;
-    tg.expand(); tg.ready();
 
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.ready();
+
+    // DOM Elements
     const video = document.getElementById('videoInput');
     const canvas = document.getElementById('canvasOutput');
     const loadingMsg = document.getElementById('loadingMessage');
     const resultsList = document.getElementById('results-list');
+    const correctCountEl = document.getElementById('correct-count');
+    const wrongCountEl = document.getElementById('wrong-count');
     const totalScannedEl = document.getElementById('total-scanned');
+    const currentQEl = document.getElementById('current-q');
     const cameraSelect = document.getElementById('cameraSelect');
     const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const answerBtns = document.querySelectorAll('.ans-btn');
     const context = canvas.getContext('2d');
 
+    // STATE
     let detector = new AR.Detector();
-    let scannedResults = {};
+    let correctAnswer = "A"; // Default to'g'ri javob
+    let currentQuestion = 1;
+    let scannedResults = {}; // {studentId: {answer, isCorrect}}
     let isProcessing = false;
 
-    // === KAMERALARNI RO'YXATDAN OLISH ===
+    // === TO'G'RI JAVOBNI TANLASH ===
+    answerBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            answerBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            correctAnswer = btn.dataset.ans;
+            log(`To'g'ri javob: ${correctAnswer}`);
+
+            // Mavjud natijalarni qayta baholash
+            recalculateResults();
+        });
+    });
+
+    // Boshlang'ich A ni tanlash
+    document.querySelector('.ans-btn[data-ans="A"]').classList.add('active');
+
+    // === NATIJALARNI QAYTA HISOBLASH ===
+    function recalculateResults() {
+        Object.keys(scannedResults).forEach(id => {
+            const ans = scannedResults[id].answer;
+            scannedResults[id].isCorrect = (ans === correctAnswer);
+        });
+        updateUI();
+    }
+
+    // === KAMERA FUNKSIYALARI ===
     async function getAvailableCameras() {
         try {
-            // Avval ruxsat so'raymiz (ba'zi brauzerlarda kerak)
             await navigator.mediaDevices.getUserMedia({ video: true });
-
             const devices = await navigator.mediaDevices.enumerateDevices();
             availableCameras = devices.filter(d => d.kind === 'videoinput');
+            log(`Kameralar: ${availableCameras.length} ta`);
 
-            log(`Topilgan kameralar: ${availableCameras.length} ta`);
-
-            // Selectni to'ldiramiz
             cameraSelect.innerHTML = '';
-            availableCameras.forEach((cam, index) => {
-                const option = document.createElement('option');
-                option.value = cam.deviceId;
-                option.textContent = cam.label || `Kamera ${index + 1}`;
-                cameraSelect.appendChild(option);
+            availableCameras.forEach((cam, i) => {
+                const opt = document.createElement('option');
+                opt.value = cam.deviceId;
+                opt.textContent = cam.label || `Kamera ${i + 1}`;
+                cameraSelect.appendChild(opt);
             });
 
-            // Orqa kamerani topishga harakat qilamiz
-            const backCam = availableCameras.find(c =>
+            // Orqa kamerani topish
+            const back = availableCameras.find(c =>
                 c.label.toLowerCase().includes('back') ||
                 c.label.toLowerCase().includes('environment') ||
-                c.label.toLowerCase().includes('rear') ||
-                c.label.toLowerCase().includes('orqa')
+                c.label.toLowerCase().includes('rear')
             );
-            if (backCam) {
-                cameraSelect.value = backCam.deviceId;
-                log("Orqa kamera avtomatik tanlandi");
-            }
+            if (back) cameraSelect.value = back.deviceId;
 
-            return availableCameras;
-        } catch (err) {
-            log("Kameralarni olishda xato: " + err.message, true);
-            return [];
+        } catch (e) {
+            log("Kamera xatosi: " + e.message, true);
         }
     }
 
-    // === KAMERANI ISHGA TUSHIRISH ===
     async function startCamera(deviceId = null) {
-        // Eski streamni to'xtatamiz
         if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-            currentStream = null;
+            currentStream.getTracks().forEach(t => t.stop());
         }
 
         const constraints = {
@@ -235,73 +255,55 @@ document.addEventListener('DOMContentLoaded', async function () {
             video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
         };
 
-        log(`Kamera so'ralmoqda... ${deviceId ? '(ID: ' + deviceId.slice(0, 8) + '...)' : '(orqa)'}`);
-
         try {
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = currentStream;
             await video.play();
             log("Kamera faol!");
             loadingMsg.style.display = 'none';
-            return true;
-        } catch (err) {
-            log("Kamera xatosi: " + err.name + " - " + err.message, true);
-
-            // Fallback: Har qanday kamera
-            if (deviceId) {
-                log("Boshqa kamerani sinab ko'ramiz...");
-                try {
-                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    video.srcObject = currentStream;
-                    await video.play();
-                    log("Fallback kamera ishladi!");
-                    loadingMsg.style.display = 'none';
-                    return true;
-                } catch (e2) {
-                    log("Hech qanday kamera ochilmadi: " + e2.message, true);
-                    loadingMsg.textContent = "Kamera ochilmadi! Ruxsat bering.";
-                }
+        } catch (e) {
+            log("Kamera: " + e.message, true);
+            // Fallback
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = currentStream;
+                await video.play();
+                log("Fallback kamera");
+                loadingMsg.style.display = 'none';
+            } catch (e2) {
+                loadingMsg.textContent = "Kamera ochilmadi!";
             }
-            return false;
         }
     }
 
-    // === KAMERANI ALMASHTIRISH ===
-    async function switchCamera() {
-        if (availableCameras.length < 2) {
-            log("Faqat 1 ta kamera bor", true);
-            return;
-        }
-        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
-        const nextCam = availableCameras[currentCameraIndex];
-        cameraSelect.value = nextCam.deviceId;
-        await startCamera(nextCam.deviceId);
-    }
-
-    // === EVENT LISTENERS ===
-    cameraSelect.addEventListener('change', async () => {
-        const deviceId = cameraSelect.value;
-        if (deviceId) {
-            await startCamera(deviceId);
-        }
+    cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
+    switchCameraBtn.addEventListener('click', () => {
+        const idx = availableCameras.findIndex(c => c.deviceId === cameraSelect.value);
+        const next = (idx + 1) % availableCameras.length;
+        cameraSelect.value = availableCameras[next]?.deviceId || '';
+        startCamera(cameraSelect.value);
     });
 
-    switchCameraBtn.addEventListener('click', switchCamera);
-
-    const nextBtn = document.getElementById('next-question-btn');
-    const finishBtn = document.getElementById('finish-test-btn');
-
-    if (nextBtn) nextBtn.onclick = () => {
-        tg.sendData(JSON.stringify({ action: "next_question" }));
+    // === BUTTONS ===
+    document.getElementById('next-question-btn').addEventListener('click', () => {
+        currentQuestion++;
+        currentQEl.textContent = currentQuestion;
         scannedResults = {};
         updateUI();
-    };
-    if (finishBtn) finishBtn.onclick = () => {
-        tg.sendData(JSON.stringify({ action: "finish_test" }));
-        tg.close();
-    };
+        log(`Savol ${currentQuestion}`);
+    });
 
-    // === VIDEO METADATA LOADED ===
+    document.getElementById('finish-test-btn').addEventListener('click', () => {
+        const data = {
+            action: "finish_test",
+            question: currentQuestion,
+            results: scannedResults
+        };
+        tg.sendData(JSON.stringify(data));
+        tg.close();
+    });
+
+    // === VIDEO READY ===
     video.onloadedmetadata = () => {
         log(`Video: ${video.videoWidth}x${video.videoHeight}`);
         canvas.width = video.videoWidth;
@@ -309,7 +311,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         if (!isProcessing) {
             isProcessing = true;
-            log("Detection loop started");
+            log("Detection started");
             requestAnimationFrame(tick);
         }
     };
@@ -320,33 +322,41 @@ document.addEventListener('DOMContentLoaded', async function () {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             try {
-                const markers = detector.detect(context.getImageData(0, 0, canvas.width, canvas.height));
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const markers = detector.detect(imageData);
 
                 markers.forEach(m => {
                     const c = m.corners;
-                    // Chizish
-                    context.strokeStyle = "lime";
-                    context.lineWidth = 3;
+                    const studentId = m.id + 1; // ID 0 dan boshlanadi, P1 uchun +1
+
+                    // Javobni aniqlash (eng tepada turgan burchak)
+                    let minY = Infinity, idx = -1;
+                    c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
+                    const ans = ["A", "B", "C", "D"][idx] || "?";
+
+                    // To'g'ri/noto'g'rini tekshirish
+                    const isCorrect = (ans === correctAnswer);
+                    const color = isCorrect ? "#00ff00" : "#ff0000";
+
+                    // Marker chizish
+                    context.strokeStyle = color;
+                    context.lineWidth = 4;
                     context.beginPath();
                     context.moveTo(c[0].x, c[0].y);
                     c.forEach(p => context.lineTo(p.x, p.y));
                     context.closePath();
                     context.stroke();
 
-                    // Javobni aniqlash
-                    let minY = Infinity, idx = -1;
-                    c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
-                    const ans = ["A", "B", "C", "D"][idx] || "?";
-
                     // Matn
-                    context.fillStyle = "lime";
-                    context.font = "bold 20px monospace";
-                    context.fillText(`ID:${m.id} (${ans})`, c[0].x, c[0].y - 10);
+                    context.fillStyle = color;
+                    context.font = "bold 24px Arial";
+                    const text = `P${studentId}: ${ans} ${isCorrect ? '✓' : '✗'}`;
+                    context.fillText(text, c[0].x, c[0].y - 15);
 
-                    // Saqlash
-                    if (!scannedResults[m.id] || scannedResults[m.id] !== ans) {
-                        scannedResults[m.id] = ans;
-                        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                    // Natijani saqlash
+                    if (!scannedResults[studentId] || scannedResults[studentId].answer !== ans) {
+                        scannedResults[studentId] = { answer: ans, isCorrect: isCorrect };
+                        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred(isCorrect ? 'light' : 'medium');
                         updateUI();
                     }
                 });
@@ -357,23 +367,28 @@ document.addEventListener('DOMContentLoaded', async function () {
         requestAnimationFrame(tick);
     }
 
+    // === UI YANGILASH ===
     function updateUI() {
-        totalScannedEl.innerText = Object.keys(scannedResults).length;
+        const results = Object.entries(scannedResults);
+        const correct = results.filter(([, r]) => r.isCorrect).length;
+        const wrong = results.filter(([, r]) => !r.isCorrect).length;
+
+        correctCountEl.textContent = correct;
+        wrongCountEl.textContent = wrong;
+        totalScannedEl.textContent = results.length;
+
         resultsList.innerHTML = "";
-        Object.keys(scannedResults).reverse().forEach(id => {
-            let li = document.createElement("li");
-            li.className = "result-item";
-            li.innerHTML = `<span>ID: ${id}</span> <strong>${scannedResults[id]}</strong>`;
+        results.forEach(([id, r]) => {
+            const li = document.createElement("li");
+            li.className = `result-item ${r.isCorrect ? 'correct' : 'wrong'}`;
+            li.innerHTML = `<span>P${id}</span> <strong>${r.answer}</strong> ${r.isCorrect ? '✅' : '❌'}`;
             resultsList.appendChild(li);
         });
     }
 
-    // === BOSHLASH ===
+    // === START ===
     await getAvailableCameras();
     if (availableCameras.length > 0) {
         await startCamera(cameraSelect.value || null);
-    } else {
-        log("Hech qanday kamera topilmadi!", true);
-        loadingMsg.textContent = "Kamera topilmadi!";
     }
 });
