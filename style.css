@@ -1,0 +1,124 @@
+/* Basic styling */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #fff;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header va Statistika */
+.top-bar {
+    padding: 10px;
+    background: rgba(30,30,30,0.9);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.header h3 {
+    margin: 0;
+    color: #4CAF50;
+}
+
+.stats {
+    display: flex;
+    justify-content: space-around;
+}
+
+.stat-box {
+    background: #333;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.stat-box.correct { color: #81c784; }
+.stat-box.wrong { color: #e57373; }
+.stat-box.total { color: #64b5f6; }
+
+/* Kamera maydoni */
+#reader {
+    width: 100%;
+    flex-grow: 1;
+    margin-top: 80px; /* Header balandligi */
+    margin-bottom: 60px; /* Footer balandligi */
+    position: relative;
+    background: #000;
+}
+
+/* Natijalar maydoni (Hozircha kichik ko'rinadi) */
+.results-container {
+    position: fixed;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 5px 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    z-index: 90;
+}
+
+.results-container ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.result-item {
+    font-size: 14px;
+    padding: 2px 0;
+    border-bottom: 1px solid #444;
+}
+
+/* Tugmalar paneli */
+.controls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #222;
+    padding: 10px;
+    display: flex;
+    justify-content: space-around;
+    z-index: 100;
+}
+
+.btn {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn.primary {
+    background-color: #2196F3;
+    color: white;
+}
+
+.btn.danger {
+    background-color: #f44336;
+    color: white;
+}
+
+#qcount {
+    color: #ff9800;
+    font-weight: bold;
+}
