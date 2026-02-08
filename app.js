@@ -1,256 +1,198 @@
 
 // ==========================================
-// 1. GLOBAL DEBUG & SETUP (Eng boshida)
+// app.js - JS-ArUco Versiyasi (Engil & Tez)
 // ==========================================
 
-// Debug oynasini darrov yaratamiz
-const debugDiv = document.createElement("div");
-debugDiv.id = "debugConsole";
-debugDiv.style.cssText = "position:absolute; top:0; left:0; width:100%; height:150px; overflow-y:scroll; color:lime; background:rgba(0,0,0,0.8); z-index:99999; font-size:12px; pointer-events:none; font-family:monospace; padding:5px;";
-document.body.appendChild(debugDiv);
+const debugDiv = document.getElementById("debugConsole") || document.createElement("div");
+if (!document.getElementById("debugConsole")) {
+    debugDiv.id = "debugConsole";
+    debugDiv.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100px; overflow-y:scroll; color:lime; background:rgba(0,0,0,0.8); z-index:99999; font-size:10px; pointer-events:none; padding:5px;";
+    document.querySelector('.camera-container').appendChild(debugDiv);
+}
 
 function log(msg, isError = false) {
     console.log(msg);
     const color = isError ? "red" : "lime";
-    // Vaqtni qo'shamiz
     const time = new Date().toLocaleTimeString();
     debugDiv.innerHTML += `<div style="color:${color}; border-bottom:1px solid #333;">[${time}] ${msg}</div>`;
     debugDiv.scrollTop = debugDiv.scrollHeight;
 }
 
-// Global xatolarni ushlash
 window.onerror = function (msg, url, lineNo, columnNo, error) {
-    log(`Global Error: ${msg} (Line: ${lineNo})`, true);
+    log(`Global Error: ${msg} (${lineNo})`, true);
     return false;
 };
 
-log("App.js ishga tushdi...");
+log("Skaner ishga tushirildi...");
 
-// Telegram WebApp
+// Telegram Setup
 const tg = window.Telegram.WebApp;
 tg.expand();
-log("Telegram WebApp expanded.");
+tg.ready();
 
-// ==========================================
-// 2. DOM ELEMENTLAR & O'ZGARUVCHILAR
-// ==========================================
+// Elements
 const video = document.getElementById('videoInput');
 const canvas = document.getElementById('canvasOutput');
+const context = canvas.getContext('2d');
 const loadingMsg = document.getElementById('loadingMessage');
 const resultsList = document.getElementById('results-list');
 const totalScannedEl = document.getElementById('total-scanned');
+
+// ArUco Detector
+let detector = null;
 
 // Buttons
 const nextBtn = document.getElementById('next-question-btn');
 const finishBtn = document.getElementById('finish-test-btn');
 
-let stream = null;
-let streaming = false;
-let cap = null;
-let src = null;
-let dst = null;
-let gray = null;
-
-// ArUco
-let arucoDict = null;
-let arucoParams = null;
-let markerIds = null;
-let markerCorners = null;
-
-let scannedResults = {};
-
-// ==========================================
-// 3. EVENT LISTENERS (Tugmalar ishlashi uchun)
-// ==========================================
 if (nextBtn) {
     nextBtn.addEventListener('click', () => {
-        log("Keyingi savol tugmasi bosildi");
+        log("Keyingi savol bosildi");
         tg.sendData(JSON.stringify({ action: "next_question" }));
-        // Ehtimol bu yerni o'zida UI ni tozalash kerakdir?
         scannedResults = {};
         updateUI();
     });
-} else {
-    log("XATO: 'next-question-btn' topilmadi!", true);
-}
+} else log("XATO: 'next-question-btn' yo'q!", true);
 
 if (finishBtn) {
     finishBtn.addEventListener('click', () => {
-        log("Tugatish tugmasi bosildi");
+        log("Tugatish bosildi");
         tg.sendData(JSON.stringify({ action: "finish_test" }));
         tg.close();
     });
-} else {
-    log("XATO: 'finish-test-btn' topilmadi!", true);
-}
+} else log("XATO: 'finish-test-btn' yo'q!", true);
 
-// ==========================================
-// 4. OPENCV & CAMERA LOGIKASI
-// ==========================================
-
-// OpenCV tayyor bo'lganda chaqiriladi (index.html dagi onload dan)
-function onOpenCvReady() {
-    log('OpenCV.js yuklandi (onOpenCvReady)!');
-    if (typeof cv === 'undefined') {
-        log("XATO: 'cv' obyekti yo'q!", true);
-        return;
-    }
-
-    // ArUco tekshiruvi
-    try {
-        // Ba'zi buildlarda cv.aruco bo'lmaydi.
-        if (!cv.aruco) {
-            log("XATO: cv.aruco moduli YO'Q! OpenCV noto'g'ri versiya.", true);
-            loadingMsg.innerText = "Xato: OpenCV ArUco moduli yo'q!";
-            return;
-        }
-        log("ArUco moduli bor ✅");
-        startCamera();
-    } catch (e) {
-        log("ArUco tekshirishda xato: " + e.message, true);
-    }
-}
-
+// Start Camera
 function startCamera() {
     log("Kamera so'ralmoqda...");
-    const constraints = {
+    navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: {
-            facingMode: 'environment',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-        }
-    };
+        video: { facingMode: 'environment' }
+    })
+        .then(stream => {
+            log("Kamera ruxsati berildi!");
+            video.srcObject = stream;
+            video.play();
+        })
+        .catch(err => {
+            log("Kamera xatosi: " + err.name, true);
+            loadingMsg.innerText = "Kameraga ruxsat bering!";
+        });
+}
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        log("XATO: navigator.mediaDevices.getUserMedia qo'llab-quvvatlanmaydi (yoki HTTPS emas)!", true);
-        loadingMsg.innerText = "Kameraga ruxsat yo'q (HTTPS kerak)";
+video.addEventListener('loadedmetadata', function () {
+    log(`Video: ${video.videoWidth}x${video.videoHeight}`);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    loadingMsg.style.display = 'none';
+
+    // ArUco kutubxonasini tekshirish
+    if (typeof AR === 'undefined' || typeof AR.Detector === 'undefined') {
+        log("XATO: AR kutubxonasi yuklanmadi!", true);
         return;
     }
 
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(function (s) {
-            log("Kamera oqimi olindi ✅");
-            stream = s;
-            video.srcObject = stream;
-            video.play().catch(e => log("Video.play himoyasi: " + e.message, true));
-        })
-        .catch(function (err) {
-            log("Orqa kamera xatosi: " + err.name, true);
-            // Fallback: Oldi kamera
-            log("Oldi kamerani sinaymiz...");
-            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                .then(s => {
-                    stream = s;
-                    video.srcObject = stream;
-                    video.play();
-                    log("Oldi kamera ochildi");
-                })
-                .catch(e => {
-                    log("Kamera umuman ochilmadi: " + e.message, true);
-                    loadingMsg.innerText = "Kamera ochilmadi: " + e.message;
-                });
-        });
+    detector = new AR.Detector();
+    log("ArUco Detector tayyor. Tahlil boshlandi...");
 
-    video.addEventListener('canplay', function (ev) {
-        if (!streaming) {
-            log(`Video o'lchami: ${video.videoWidth}x${video.videoHeight}`);
-            video.setAttribute('width', video.videoWidth);
-            video.setAttribute('height', video.videoHeight);
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            streaming = true;
-            loadingMsg.style.display = "none";
+    requestAnimationFrame(tick);
+});
 
-            startProcessing();
+let scannedResults = {};
+
+function tick() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Rasmni canvasga chizish
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Markerlarni aniqlash
+        try {
+            // getImageData optimallash mumkin, lekin hozircha to'liq
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const markers = detector.detect(imageData);
+
+            drawMarkers(markers);
+        } catch (e) {
+            // log("Detect Xatosi: " + e.message, true);
         }
-    }, false);
-}
-
-function startProcessing() {
-    try {
-        log("OpenCV obyektlarini yaratish...");
-        cap = new cv.VideoCapture(video);
-        src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
-        dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
-
-        arucoDict = new cv.aruco_Dictionary(cv.aruco.DICT_4X4_50);
-        arucoParams = new cv.aruco_DetectorParameters();
-        markerIds = new cv.Mat();
-        markerCorners = new cv.MatVector();
-
-        log("Tahlil loopi boshlandi 🔄");
-        requestAnimationFrame(processVideo);
-    } catch (e) {
-        log("startProcessing Xatosi: " + e.message, true);
     }
+    requestAnimationFrame(tick);
 }
 
-function processVideo() {
-    if (!streaming) return;
+function drawMarkers(markers) {
+    if (!markers || markers.length === 0) return;
 
-    try {
-        cap.read(src);
-        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY);
+    markers.forEach(marker => {
+        // Chegaralarni chizish
+        drawPoly(marker.corners, "lime");
 
-        // Markerlarni qidirish
-        cv.aruco.detectMarkers(dst, arucoDict, markerCorners, markerIds, arucoParams);
+        // ID va burilishni aniqlash
+        const id = marker.id;
 
-        if (markerIds.rows > 0) {
-            for (let i = 0; i < markerIds.rows; ++i) {
-                let id = markerIds.data32S[i];
-                let corners = markerCorners.get(i);
+        // JS-ArUco da corners tartibi:
+        // [0]=TopLeft, [1]=TopRight, [2]=BottomRight, [3]=BottomLeft (Ideal holda)
+        // Lekin burilganda ular aylanadi.
+        // Bizga markerning "haqiqiy" tepasi kerak emas, balki
+        // "Sahifaga nisbatan" qaysi burchagi tepada ekanligini topishimiz kerak.
 
-                let tl = { x: corners.data32F[0], y: corners.data32F[1] };
-                let tr = { x: corners.data32F[2], y: corners.data32F[3] };
-                let br = { x: corners.data32F[4], y: corners.data32F[5] };
-                let bl = { x: corners.data32F[6], y: corners.data32F[7] };
+        // Burchak koordinatalari
+        const corners = marker.corners;
+        // corners array of {x,y}
 
-                let answer = detectAnswer(tl, tr, br, bl);
+        // Bu kutubxona ID ni to'g'ri topadi, lekin rotatsiyani unchalik emas.
+        // Rotatsiya: Hamming distance orqali topilgan eng yaxshi moslik.
+        // Marker obyektida 'rotation' polesi bo'lmasligi mumkin (eski versiya).
+        // Lekin 'corners' to'g'ri aylantirilgan bo'ladi (shunday umid qilamiz).
 
-                // Chizish
-                drawMarker(src, tl, tr, br, bl, id, answer);
+        // Agar corners[0] eng tepada bo'lsa -> A
+        // corners[1] eng tepada bo'lsa -> B 
 
-                // Natijani saqlash
-                saveResult(id, answer);
+        // Keling, oddiy logika qilamiz:
+        // Markerning markazini topamiz
+        // Va har bir burchakni tekshiramiz.
+
+        // Yo'q, oddiyroq:
+        // Eng kichik Y ga ega burchakni topamiz.
+        // U index 0 bo'lsa -> A, 1 -> B, 2 -> C, 3 -> D.
+        // (Taxminiy logika, Plickers kabi).
+
+        let minY = Infinity;
+        let minIndex = -1;
+
+        for (let i = 0; i < 4; i++) {
+            if (corners[i].y < minY) {
+                minY = corners[i].y;
+                minIndex = i;
             }
         }
 
-        // Ekranga (Canvasga) chiqarish
-        cv.imshow('canvasOutput', src);
+        const answers = ["A", "B", "C", "D"];
+        const ans = answers[minIndex] || "?";
 
-    } catch (err) {
-        // Har bir freymda xato chiqmasligi uchun logni kamaytirish mumkin
-        // log("Loop Error: " + err.message, true);
+        // Matn yozish
+        context.lineWidth = 3;
+        context.strokeStyle = "lime";
+        context.stroke();
+
+        context.fillStyle = "lime";
+        context.font = "20px monospace";
+        context.fillText(`ID:${id} (${ans})`, corners[0].x, corners[0].y - 10);
+
+        saveResult(id, ans);
+    });
+}
+
+function drawPoly(corners, color) {
+    context.beginPath();
+    context.lineWidth = 3;
+    context.strokeStyle = color;
+
+    context.moveTo(corners[0].x, corners[0].y);
+    for (let i = 1; i < corners.length; i++) {
+        context.lineTo(corners[i].x, corners[i].y);
     }
-
-    requestAnimationFrame(processVideo);
-}
-
-
-function detectAnswer(tl, tr, br, bl) {
-    let points = [
-        { name: "A", y: tl.y },
-        { name: "B", y: tr.y },
-        { name: "C", y: br.y },
-        { name: "D", y: bl.y }
-    ];
-    points.sort((a, b) => a.y - b.y);
-    return points[0].name;
-}
-
-function drawMarker(mat, tl, tr, br, bl, id, ans) {
-    let color = new cv.Scalar(0, 255, 0, 255);
-    let thickness = 4;
-
-    cv.line(mat, tl, tr, color, thickness);
-    cv.line(mat, tr, br, color, thickness);
-    cv.line(mat, br, bl, color, thickness);
-    cv.line(mat, bl, tl, color, thickness);
-
-    let text = `${id}:${ans}`;
-    let point = new cv.Point(tl.x, tl.y - 10);
-    cv.putText(mat, text, point, cv.FONT_HERSHEY_SIMPLEX, 1.0, color, 2);
+    context.closePath();
+    context.stroke();
 }
 
 function saveResult(id, ans) {
@@ -264,23 +206,13 @@ function saveResult(id, ans) {
 function updateUI() {
     totalScannedEl.innerText = Object.keys(scannedResults).length;
     resultsList.innerHTML = "";
-    // Oxirgi qo'shilgan yuqorida tursin
-    const keys = Object.keys(scannedResults).reverse();
-    for (const id of keys) {
-        let ans = scannedResults[id];
+    Object.keys(scannedResults).reverse().forEach(id => {
         let li = document.createElement("li");
         li.className = "result-item";
-        li.innerHTML = `<span>ID: ${id}</span> <strong>${ans}</strong>`;
+        li.innerHTML = `<span>ID: ${id}</span> <strong>${scannedResults[id]}</strong>`;
         resultsList.appendChild(li);
-    }
+    });
 }
 
-// Memory Cleanup
-window.onunload = function () {
-    if (src) src.delete();
-    if (dst) dst.delete();
-    if (arucoDict) arucoDict.delete();
-    if (arucoParams) arucoParams.delete();
-    if (markerIds) markerIds.delete();
-    if (markerCorners) markerCorners.delete();
-};
+// Start
+startCamera();

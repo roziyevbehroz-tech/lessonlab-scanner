@@ -6,8 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLabQR Scanner</title>
     <link rel="stylesheet" href="style.css">
-    <!-- OpenCV.js (ArUco uchun) -->
-    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+
+    <!-- JS-ArUco Library (Lightweight) -->
+    <script src="https://unpkg.com/js-aruco@0.1.0/src/cv.js"></script>
+    <script src="https://unpkg.com/js-aruco@0.1.0/src/aruco.js"></script>
+
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -34,7 +37,14 @@
     </div>
 
     <!-- Kamera oynasi -->
-    <div id="reader"></div>
+    <div class="camera-container">
+        <!-- Debug oynasi -->
+        <div id="debugConsole"></div>
+
+        <video id="videoInput" playsinline style="display:none;"></video>
+        <canvas id="canvasOutput"></canvas>
+        <div id="loadingMessage">Kamera yuklanmoqda...</div>
+    </div>
 
     <!-- Pastki qism: Natijalar ro'yxati -->
     <div class="results-container">
@@ -46,8 +56,8 @@
 
     <!-- Boshqaruv tugmalari -->
     <div class="controls">
-        <button id="next-btn" class="btn primary">Keyingi savol ➡️</button>
-        <button id="finish-btn" class="btn danger">Tugatish 🏁</button>
+        <button id="next-question-btn" class="btn primary">Keyingi savol ➡️</button>
+        <button id="finish-test-btn" class="btn danger">Tugatish 🏁</button>
     </div>
 
     <script src="app.js"></script>
