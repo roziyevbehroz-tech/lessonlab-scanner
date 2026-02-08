@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="uz">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLabQR Scanner</title>
     <link rel="stylesheet" href="style.css">
-    <!-- QR Kod kutubxonasini yuklaymiz -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- OpenCV.js (ArUco uchun) -->
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
 
     <!-- Yuqori qism: Sarlavha va Statistika -->
@@ -50,4 +52,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
