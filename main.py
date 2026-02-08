@@ -1,6 +1,7 @@
 import asyncio
 import logging
-import os # To'g'ri joyda import qilindi
+import os
+import json
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import FSInputFile
@@ -165,6 +166,32 @@ async def handle_document(message: types.Message):
         await message.answer(f"❌ Xatolik yuz berdi: {str(e)}")
         if os.path.exists(destination):
             os.remove(destination)
+
+# --- 3.3 SCANNER NATIJALARINI QABUL QILISH (WEB APP DATA) ---
+@dp.message(F.web_app_data)
+async def handle_scanner_data(message: types.Message):
+    data = message.web_app_data.data
+    try:
+        json_data = json.loads(data)
+        if json_data.get("action") == "finish_test":
+            results = json_data.get("results", {})
+            question_count = json_data.get("question", 1)
+            
+            correct = sum(1 for r in results.values() if r["isCorrect"])
+            total = len(results)
+            
+            res_text = (
+                f"📊 <b>Test natijalari qabul qilindi!</b>\n\n"
+                f"📝 Savollar soni: {question_count}\n"
+                f"👥 Skanerlangan o'quvchilar: {total} ta\n"
+                f"✅ To'g'ri javoblar: {correct} ta\n"
+                f"❌ Noto'g'ri javoblar: {total - correct} ta\n\n"
+                f"<i>Batafsil ma'lumot 'Natijalar' bo'limida saqlanadi.</i>"
+            )
+            await message.answer(res_text, parse_mode="HTML")
+            
+    except Exception as e:
+        await message.answer(f"⚠️ Ma'lumotni tahlil qilishda xatolik: {str(e)}")
 
 # 3.2 Matn orqali
 @dp.message(F.text & ~F.text.startswith("/")) 

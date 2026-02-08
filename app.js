@@ -189,7 +189,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     let correctAnswer = "A"; // Default to'g'ri javob
     let currentQuestion = 1;
     let scannedResults = {}; // {studentId: {answer, isCorrect}}
+    let frameBuffers = {}; // {studentId: [ans1, ans2, ...]}
     let isProcessing = false;
+
+    const BUFFER_SIZE = 5; // Nechta kadr ketma-ket bir xil bo'lishi kerak
 
     // === TO'G'RI JAVOBNI TANLASH ===
     answerBtns.forEach(btn => {
@@ -327,37 +330,34 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 markers.forEach(m => {
                     const c = m.corners;
-                    const studentId = m.id + 1; // ID 0 dan boshlanadi, P1 uchun +1
+                    const studentId = m.id + 1;
 
-                    // Javobni aniqlash (eng tepada turgan burchak)
+                    // Javobni aniqlash
                     let minY = Infinity, idx = -1;
                     c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
-                    const ans = ["A", "B", "C", "D"][idx] || "?";
+                    const currentAns = ["A", "B", "C", "D"][idx] || "?";
 
-                    // To'g'ri/noto'g'rini tekshirish
-                    const isCorrect = (ans === correctAnswer);
-                    const color = isCorrect ? "#00ff00" : "#ff0000";
+                    // --- LOCK-IN LOGIC (FLICKERING OLDINI OLISH) ---
+                    if (!frameBuffers[studentId]) frameBuffers[studentId] = [];
+                    frameBuffers[studentId].push(currentAns);
+                    if (frameBuffers[studentId].length > BUFFER_SIZE) frameBuffers[studentId].shift();
 
-                    // Marker chizish
-                    context.strokeStyle = color;
-                    context.lineWidth = 4;
-                    context.beginPath();
-                    context.moveTo(c[0].x, c[0].y);
-                    c.forEach(p => context.lineTo(p.x, p.y));
-                    context.closePath();
-                    context.stroke();
+                    // Agar oxirgi N ta kadrda bir xil natija bo'lsa, javobni qabul qilamiz
+                    const isStable = frameBuffers[studentId].length >= BUFFER_SIZE && frameBuffers[studentId].every(a => a === currentAns);
 
-                    // Matn
-                    context.fillStyle = color;
-                    context.font = "bold 24px Arial";
-                    const text = `P${studentId}: ${ans} ${isCorrect ? '✓' : '✗'}`;
-                    context.fillText(text, c[0].x, c[0].y - 15);
+                    if (isStable) {
+                        const isCorrect = (currentAns === correctAnswer);
+                        drawMarkerBox(c, isCorrect, studentId, currentAns);
 
-                    // Natijani saqlash
-                    if (!scannedResults[studentId] || scannedResults[studentId].answer !== ans) {
-                        scannedResults[studentId] = { answer: ans, isCorrect: isCorrect };
-                        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred(isCorrect ? 'light' : 'medium');
-                        updateUI();
+                        // Natijani saqlash
+                        if (!scannedResults[studentId] || scannedResults[studentId].answer !== currentAns) {
+                            scannedResults[studentId] = { answer: currentAns, isCorrect: isCorrect };
+                            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
+                            updateUI();
+                        }
+                    } else {
+                        // Stabil emas, kulrang ramka chizamiz
+                        drawMarkerBox(c, null, studentId, currentAns);
                     }
                 });
             } catch (e) {
@@ -365,6 +365,45 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
         requestAnimationFrame(tick);
+    }
+
+    function drawMarkerBox(corners, isCorrect, id, ans) {
+        let color = "#888888"; // Barqaror emas
+        let label = `P${id}: ?`;
+
+        if (isCorrect === true) {
+            color = "#00ff00";
+            label = `P${id}: ${ans} ✓`;
+        } else if (isCorrect === false) {
+            color = "#ff4444";
+            label = `P${id}: ${ans} ✗`;
+        } else {
+            label = `P${id}: ${ans} ...`;
+        }
+
+        context.strokeStyle = color;
+        context.lineWidth = 4;
+
+        context.beginPath();
+        context.moveTo(corners[0].x, corners[0].y);
+        corners.forEach(p => context.lineTo(p.x, p.y));
+        context.closePath();
+        context.stroke();
+
+        // Markerni ichini bo'yash (semi-transparent)
+        context.fillStyle = isCorrect === null ? "rgba(128,128,128,0.2)" :
+            (isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)");
+        context.fill();
+
+        // Label fon
+        context.fillStyle = color;
+        const textWidth = context.measureText(label).width;
+        context.fillRect(corners[0].x, corners[0].y - 35, textWidth + 10, 30);
+
+        // Label matn
+        context.fillStyle = "#000";
+        context.font = "bold 20px Arial";
+        context.fillText(label, corners[0].x + 5, corners[0].y - 12);
     }
 
     // === UI YANGILASH ===

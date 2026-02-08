@@ -38,48 +38,53 @@ html {
 #qcount {
     color: #ff9800;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .stats {
     display: flex;
     justify-content: space-around;
-    gap: 10px;
+    gap: 15px;
 }
 
 .stat-box {
-    background: #333;
-    padding: 5px 12px;
-    border-radius: 5px;
-    font-size: 14px;
+    background: #1e1e1e;
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-size: 16px;
     font-weight: bold;
+    border: 1px solid #333;
 }
 
 .stat-box.correct {
-    color: #81c784;
+    color: #4CAF50;
+    border-color: #2e7d32;
 }
 
 .stat-box.wrong {
-    color: #e57373;
+    color: #f44336;
+    border-color: #c62828;
 }
 
 .stat-box.total {
-    color: #64b5f6;
+    color: #2196F3;
+    border-color: #1565c0;
 }
 
 /* TO'G'RI JAVOB TANLASH */
 .answer-selector {
     position: fixed;
-    top: 70px;
+    top: 85px;
     left: 0;
     right: 0;
-    background: #1a237e;
-    padding: 8px 10px;
+    background: #1a1a1a;
+    padding: 12px 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    z-index: 99;
+    gap: 12px;
+    z-index: 101;
+    border-bottom: 2px solid #333;
 }
 
 .answer-selector span {
@@ -113,7 +118,7 @@ html {
 /* Kamera sozlamalari */
 .camera-settings {
     position: fixed;
-    top: 120px;
+    top: 150px;
     left: 0;
     right: 0;
     background: #0d1421;
@@ -164,7 +169,7 @@ html {
     flex: 1;
     position: relative;
     background-color: #000;
-    margin-top: 160px;
+    margin-top: 195px;
     margin-bottom: 120px;
 }
 
