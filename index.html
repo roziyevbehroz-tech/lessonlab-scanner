@@ -6,10 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLabQR Scanner</title>
     <link rel="stylesheet" href="style.css">
-
-    <!-- NO EXTERNAL LIBS NEEDED - ALL BUNDLED IN APP.JS -->
-
-    <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 
@@ -34,12 +30,18 @@
         </div>
     </div>
 
+    <!-- KAMERA SOZLAMALARI -->
+    <div class="camera-settings">
+        <select id="cameraSelect">
+            <option value="">Kamerani tanlang...</option>
+        </select>
+        <button id="switchCameraBtn" class="btn small">🔄 Almashtirish</button>
+    </div>
+
     <!-- Kamera oynasi -->
     <div class="camera-container">
-        <!-- Debug oynasi -->
         <div id="debugConsole"></div>
-
-        <video id="videoInput" playsinline style="display:none;"></video>
+        <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
         <canvas id="canvasOutput"></canvas>
         <div id="loadingMessage">Kamera yuklanmoqda...</div>
     </div>
@@ -47,9 +49,7 @@
     <!-- Pastki qism: Natijalar ro'yxati -->
     <div class="results-container">
         <h4>Oxirgi natijalar:</h4>
-        <ul id="results-list">
-            <!-- Natijalar shu yerga tushadi -->
-        </ul>
+        <ul id="results-list"></ul>
     </div>
 
     <!-- Boshqaruv tugmalari -->

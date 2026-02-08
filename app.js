@@ -24,7 +24,7 @@ CV.adaptiveThreshold = function (imageSrc, imageDst, kernelSize, threshold) {
     for (i = 0; i < len; ++i) { dst[i] = tab[src[i] - dst[i] + 255]; }
 };
 CV.otsu = function (imageSrc) {
-    var src = imageSrc.data, len = imageSrc.width * imageSrc.height, hist = [], threshold = 0, sum = 0, sumB = 0, wB = 0, wF = 0, max = 0, mu, medical, between, i;
+    var src = imageSrc.data, len = imageSrc.width * imageSrc.height, hist = [], threshold = 0, sum = 0, sumB = 0, wB = 0, wF = 0, max = 0, mu, between, i;
     for (i = 0; i < 256; ++i) { hist[i] = 0; }
     for (i = 0; i < len; ++i) { hist[src[i]]++; }
     for (i = 0; i < 256; ++i) { sum += i * hist[i]; }
@@ -146,11 +146,16 @@ AR.Detector.prototype.rotate = function (src) { var dst = [], len = src.length, 
 AR.Detector.prototype.rotate2 = function (src, rotation) { var dst = [], len = src.length, i; for (i = 0; i < len; ++i) { dst[i] = src[(rotation + i) % len]; } return dst; };
 
 // ==========================================
-// APP LOGIC (Scanner)
+// APP LOGIC (Scanner with Camera Selection)
 // ==========================================
 
 let debugDiv = null;
+let currentStream = null;
+let availableCameras = [];
+let currentCameraIndex = 0;
+
 function log(msg, isError = false) {
+    console.log(msg);
     if (!debugDiv) { debugDiv = document.getElementById("debugConsole"); }
     if (debugDiv) {
         const color = isError ? "red" : "lime";
@@ -160,7 +165,7 @@ function log(msg, isError = false) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     log("Scanner starting...");
     const tg = window.Telegram.WebApp;
     tg.expand(); tg.ready();
@@ -170,39 +175,184 @@ document.addEventListener('DOMContentLoaded', function () {
     const loadingMsg = document.getElementById('loadingMessage');
     const resultsList = document.getElementById('results-list');
     const totalScannedEl = document.getElementById('total-scanned');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
     const context = canvas.getContext('2d');
 
     let detector = new AR.Detector();
     let scannedResults = {};
+    let isProcessing = false;
+
+    // === KAMERALARNI RO'YXATDAN OLISH ===
+    async function getAvailableCameras() {
+        try {
+            // Avval ruxsat so'raymiz (ba'zi brauzerlarda kerak)
+            await navigator.mediaDevices.getUserMedia({ video: true });
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            availableCameras = devices.filter(d => d.kind === 'videoinput');
+
+            log(`Topilgan kameralar: ${availableCameras.length} ta`);
+
+            // Selectni to'ldiramiz
+            cameraSelect.innerHTML = '';
+            availableCameras.forEach((cam, index) => {
+                const option = document.createElement('option');
+                option.value = cam.deviceId;
+                option.textContent = cam.label || `Kamera ${index + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            // Orqa kamerani topishga harakat qilamiz
+            const backCam = availableCameras.find(c =>
+                c.label.toLowerCase().includes('back') ||
+                c.label.toLowerCase().includes('environment') ||
+                c.label.toLowerCase().includes('rear') ||
+                c.label.toLowerCase().includes('orqa')
+            );
+            if (backCam) {
+                cameraSelect.value = backCam.deviceId;
+                log("Orqa kamera avtomatik tanlandi");
+            }
+
+            return availableCameras;
+        } catch (err) {
+            log("Kameralarni olishda xato: " + err.message, true);
+            return [];
+        }
+    }
+
+    // === KAMERANI ISHGA TUSHIRISH ===
+    async function startCamera(deviceId = null) {
+        // Eski streamni to'xtatamiz
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+
+        const constraints = {
+            audio: false,
+            video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
+        };
+
+        log(`Kamera so'ralmoqda... ${deviceId ? '(ID: ' + deviceId.slice(0, 8) + '...)' : '(orqa)'}`);
+
+        try {
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+            await video.play();
+            log("Kamera faol!");
+            loadingMsg.style.display = 'none';
+            return true;
+        } catch (err) {
+            log("Kamera xatosi: " + err.name + " - " + err.message, true);
+
+            // Fallback: Har qanday kamera
+            if (deviceId) {
+                log("Boshqa kamerani sinab ko'ramiz...");
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = currentStream;
+                    await video.play();
+                    log("Fallback kamera ishladi!");
+                    loadingMsg.style.display = 'none';
+                    return true;
+                } catch (e2) {
+                    log("Hech qanday kamera ochilmadi: " + e2.message, true);
+                    loadingMsg.textContent = "Kamera ochilmadi! Ruxsat bering.";
+                }
+            }
+            return false;
+        }
+    }
+
+    // === KAMERANI ALMASHTIRISH ===
+    async function switchCamera() {
+        if (availableCameras.length < 2) {
+            log("Faqat 1 ta kamera bor", true);
+            return;
+        }
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+        const nextCam = availableCameras[currentCameraIndex];
+        cameraSelect.value = nextCam.deviceId;
+        await startCamera(nextCam.deviceId);
+    }
+
+    // === EVENT LISTENERS ===
+    cameraSelect.addEventListener('change', async () => {
+        const deviceId = cameraSelect.value;
+        if (deviceId) {
+            await startCamera(deviceId);
+        }
+    });
+
+    switchCameraBtn.addEventListener('click', switchCamera);
 
     const nextBtn = document.getElementById('next-question-btn');
     const finishBtn = document.getElementById('finish-test-btn');
 
-    if (nextBtn) nextBtn.onclick = () => { tg.sendData(JSON.stringify({ action: "next_question" })); scannedResults = {}; updateUI(); };
-    if (finishBtn) finishBtn.onclick = () => { tg.sendData(JSON.stringify({ action: "finish_test" })); tg.close(); };
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(s => { video.srcObject = s; video.play(); log("Camera active."); })
-        .catch(e => { log("Camera error: " + e.message, true); });
-
-    video.onloadedmetadata = () => {
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        loadingMsg.style.display = 'none'; log("Detection loop started.");
-        requestAnimationFrame(tick);
+    if (nextBtn) nextBtn.onclick = () => {
+        tg.sendData(JSON.stringify({ action: "next_question" }));
+        scannedResults = {};
+        updateUI();
+    };
+    if (finishBtn) finishBtn.onclick = () => {
+        tg.sendData(JSON.stringify({ action: "finish_test" }));
+        tg.close();
     };
 
+    // === VIDEO METADATA LOADED ===
+    video.onloadedmetadata = () => {
+        log(`Video: ${video.videoWidth}x${video.videoHeight}`);
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        if (!isProcessing) {
+            isProcessing = true;
+            log("Detection loop started");
+            requestAnimationFrame(tick);
+        }
+    };
+
+    // === MAIN DETECTION LOOP ===
     function tick() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const markers = detector.detect(context.getImageData(0, 0, canvas.width, canvas.height));
-            markers.forEach(m => {
-                const c = m.corners;
-                context.strokeStyle = "lime"; context.lineWidth = 3; context.beginPath(); context.moveTo(c[0].x, c[0].y); c.forEach(p => context.lineTo(p.x, p.y)); context.closePath(); context.stroke();
-                let minY = Infinity, idx = -1; c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
-                const ans = ["A", "B", "C", "D"][idx] || "?";
-                context.fillStyle = "lime"; context.font = "bold 20px monospace"; context.fillText(`ID:${m.id} (${ans})`, c[0].x, c[0].y - 10);
-                if (!scannedResults[m.id] || scannedResults[m.id] !== ans) { scannedResults[m.id] = ans; if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium'); updateUI(); }
-            });
+
+            try {
+                const markers = detector.detect(context.getImageData(0, 0, canvas.width, canvas.height));
+
+                markers.forEach(m => {
+                    const c = m.corners;
+                    // Chizish
+                    context.strokeStyle = "lime";
+                    context.lineWidth = 3;
+                    context.beginPath();
+                    context.moveTo(c[0].x, c[0].y);
+                    c.forEach(p => context.lineTo(p.x, p.y));
+                    context.closePath();
+                    context.stroke();
+
+                    // Javobni aniqlash
+                    let minY = Infinity, idx = -1;
+                    c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
+                    const ans = ["A", "B", "C", "D"][idx] || "?";
+
+                    // Matn
+                    context.fillStyle = "lime";
+                    context.font = "bold 20px monospace";
+                    context.fillText(`ID:${m.id} (${ans})`, c[0].x, c[0].y - 10);
+
+                    // Saqlash
+                    if (!scannedResults[m.id] || scannedResults[m.id] !== ans) {
+                        scannedResults[m.id] = ans;
+                        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+                        updateUI();
+                    }
+                });
+            } catch (e) {
+                // Silent
+            }
         }
         requestAnimationFrame(tick);
     }
@@ -211,9 +361,19 @@ document.addEventListener('DOMContentLoaded', function () {
         totalScannedEl.innerText = Object.keys(scannedResults).length;
         resultsList.innerHTML = "";
         Object.keys(scannedResults).reverse().forEach(id => {
-            let li = document.createElement("li"); li.className = "result-item";
+            let li = document.createElement("li");
+            li.className = "result-item";
             li.innerHTML = `<span>ID: ${id}</span> <strong>${scannedResults[id]}</strong>`;
             resultsList.appendChild(li);
         });
+    }
+
+    // === BOSHLASH ===
+    await getAvailableCameras();
+    if (availableCameras.length > 0) {
+        await startCamera(cameraSelect.value || null);
+    } else {
+        log("Hech qanday kamera topilmadi!", true);
+        loadingMsg.textContent = "Kamera topilmadi!";
     }
 });
