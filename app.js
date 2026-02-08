@@ -1,131 +1,167 @@
 
-// Telegram WebApp obyektini olamiz
-const tg = window.Telegram.WebApp;
-tg.expand(); // Ilovani to'liq ekranga yoyish
+// ==========================================
+// 1. GLOBAL DEBUG & SETUP (Eng boshida)
+// ==========================================
 
-// DOM elementlar
+// Debug oynasini darrov yaratamiz
+const debugDiv = document.createElement("div");
+debugDiv.id = "debugConsole";
+debugDiv.style.cssText = "position:absolute; top:0; left:0; width:100%; height:150px; overflow-y:scroll; color:lime; background:rgba(0,0,0,0.8); z-index:99999; font-size:12px; pointer-events:none; font-family:monospace; padding:5px;";
+document.body.appendChild(debugDiv);
+
+function log(msg, isError = false) {
+    console.log(msg);
+    const color = isError ? "red" : "lime";
+    // Vaqtni qo'shamiz
+    const time = new Date().toLocaleTimeString();
+    debugDiv.innerHTML += `<div style="color:${color}; border-bottom:1px solid #333;">[${time}] ${msg}</div>`;
+    debugDiv.scrollTop = debugDiv.scrollHeight;
+}
+
+// Global xatolarni ushlash
+window.onerror = function (msg, url, lineNo, columnNo, error) {
+    log(`Global Error: ${msg} (Line: ${lineNo})`, true);
+    return false;
+};
+
+log("App.js ishga tushdi...");
+
+// Telegram WebApp
+const tg = window.Telegram.WebApp;
+tg.expand();
+log("Telegram WebApp expanded.");
+
+// ==========================================
+// 2. DOM ELEMENTLAR & O'ZGARUVCHILAR
+// ==========================================
 const video = document.getElementById('videoInput');
 const canvas = document.getElementById('canvasOutput');
 const loadingMsg = document.getElementById('loadingMessage');
 const resultsList = document.getElementById('results-list');
 const totalScannedEl = document.getElementById('total-scanned');
 
+// Buttons
+const nextBtn = document.getElementById('next-question-btn');
+const finishBtn = document.getElementById('finish-test-btn');
+
 let stream = null;
 let streaming = false;
-let videoWidth = 0;
-let videoHeight = 0;
 let cap = null;
 let src = null;
 let dst = null;
 let gray = null;
 
-// ArUco o'zgaruvchilari
+// ArUco
 let arucoDict = null;
 let arucoParams = null;
 let markerIds = null;
 let markerCorners = null;
 
-// Statistika
 let scannedResults = {};
 
-// DEBUG FUNKSIYALARI (Ekranga xato chiqarish uchun)
-function createDebugUI() {
-    let d = document.getElementById("debugConsole");
-    if (!d) {
-        d = document.createElement("div");
-        d.id = "debugConsole";
-        d.style.cssText = "position:absolute; top:0; left:0; width:100%; max-height:150px; overflow-y:scroll; color:lime; background:rgba(0,0,0,0.8); z-index:99999; font-size:10px; pointer-events:none; font-family:monospace;";
-        document.body.appendChild(d);
-    }
-    return d;
+// ==========================================
+// 3. EVENT LISTENERS (Tugmalar ishlashi uchun)
+// ==========================================
+if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+        log("Keyingi savol tugmasi bosildi");
+        tg.sendData(JSON.stringify({ action: "next_question" }));
+        // Ehtimol bu yerni o'zida UI ni tozalash kerakdir?
+        scannedResults = {};
+        updateUI();
+    });
+} else {
+    log("XATO: 'next-question-btn' topilmadi!", true);
 }
 
-function logDebug(msg, isError = false) {
-    console.log(msg);
-    const d = createDebugUI();
-    const color = isError ? "red" : "lime";
-    d.innerHTML += `<div style="color:${color}; border-bottom:1px solid #333;">${msg}</div>`;
-    d.scrollTop = d.scrollHeight;
+if (finishBtn) {
+    finishBtn.addEventListener('click', () => {
+        log("Tugatish tugmasi bosildi");
+        tg.sendData(JSON.stringify({ action: "finish_test" }));
+        tg.close();
+    });
+} else {
+    log("XATO: 'finish-test-btn' topilmadi!", true);
 }
 
-window.onerror = function (msg, url, lineNo, columnNo, error) {
-    logDebug("Global Error: " + msg + " line:" + lineNo, true);
-    return false;
-};
+// ==========================================
+// 4. OPENCV & CAMERA LOGIKASI
+// ==========================================
 
-// OpenCV tayyor bo'lganda ishga tushadi
+// OpenCV tayyor bo'lganda chaqiriladi (index.html dagi onload dan)
 function onOpenCvReady() {
-    logDebug('OpenCV.js muvaffaqiyatli yuklandi!');
-    loadingMsg.innerText = "OpenCV yuklandi. Kamera kutilmoqda...";
-
-    // ArUco borligini tekshirish
+    log('OpenCV.js yuklandi (onOpenCvReady)!');
     if (typeof cv === 'undefined') {
-        logDebug("XATOLIK: cv obyekti mavjud emas!", true);
+        log("XATO: 'cv' obyekti yo'q!", true);
         return;
     }
 
-    // ArUco moduli tekshiruvi
-    // Ba'zi versiyalarda cv.aruco bo'ladi, ba'zilarida yo'q.
+    // ArUco tekshiruvi
     try {
+        // Ba'zi buildlarda cv.aruco bo'lmaydi.
         if (!cv.aruco) {
-            logDebug("DIQQAT: cv.aruco topilmadi! Standart opencv.js da ArUco bo'lmasligi mumkin.", true);
-            logDebug("Iltimos, index.html da ArUco qo'shilgan OpenCV versiyasini ishlating.", true);
-            // Baribir davom etib ko'ramiz, balki boshqa joydadir
-        } else {
-            logDebug("ArUco moduli topildi!");
+            log("XATO: cv.aruco moduli YO'Q! OpenCV noto'g'ri versiya.", true);
+            loadingMsg.innerText = "Xato: OpenCV ArUco moduli yo'q!";
+            return;
         }
+        log("ArUco moduli bor ✅");
+        startCamera();
     } catch (e) {
-        logDebug("Check error: " + e.message, true);
+        log("ArUco tekshirishda xato: " + e.message, true);
     }
-
-    startCamera();
 }
 
 function startCamera() {
-    logDebug("Kamera so'ralmoqda (environment)...");
-
+    log("Kamera so'ralmoqda...");
     const constraints = {
         audio: false,
         video: {
-            facingMode: 'environment', // Orqa kamera
+            facingMode: 'environment',
             width: { ideal: 640 },
             height: { ideal: 480 }
         }
     };
 
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        log("XATO: navigator.mediaDevices.getUserMedia qo'llab-quvvatlanmaydi (yoki HTTPS emas)!", true);
+        loadingMsg.innerText = "Kameraga ruxsat yo'q (HTTPS kerak)";
+        return;
+    }
+
     navigator.mediaDevices.getUserMedia(constraints)
         .then(function (s) {
+            log("Kamera oqimi olindi ✅");
             stream = s;
             video.srcObject = stream;
-            video.play();
-            logDebug("Kamera ruxsati berildi!");
+            video.play().catch(e => log("Video.play himoyasi: " + e.message, true));
         })
         .catch(function (err) {
-            logDebug("Kamera xatosi: " + err.name + ": " + err.message, true);
-            loadingMsg.innerText = "Xato: Kamera ochilmadi (" + err.name + ")";
-
-            // Agar environment bo'lmasa, user (oldi) kamerani sinab ko'ramiz
-            logDebug("Oldi kamerani sinab ko'ramiz...");
+            log("Orqa kamera xatosi: " + err.name, true);
+            // Fallback: Oldi kamera
+            log("Oldi kamerani sinaymiz...");
             navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-                .then(function (s) {
+                .then(s => {
                     stream = s;
                     video.srcObject = stream;
                     video.play();
-                    logDebug("Oldi kamera ochildi!");
+                    log("Oldi kamera ochildi");
                 })
-                .catch(e => logDebug("Oldi kamera ham ochilmadi: " + e.message, true));
+                .catch(e => {
+                    log("Kamera umuman ochilmadi: " + e.message, true);
+                    loadingMsg.innerText = "Kamera ochilmadi: " + e.message;
+                });
         });
 
     video.addEventListener('canplay', function (ev) {
         if (!streaming) {
-            logDebug("Video o'lchami olindi: " + video.videoWidth + "x" + video.videoHeight);
-            videoWidth = video.videoWidth;
-            videoHeight = video.videoHeight;
-            canvas.width = videoWidth;
-            canvas.height = videoHeight;
+            log(`Video o'lchami: ${video.videoWidth}x${video.videoHeight}`);
+            video.setAttribute('width', video.videoWidth);
+            video.setAttribute('height', video.videoHeight);
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             streaming = true;
-
             loadingMsg.style.display = "none";
+
             startProcessing();
         }
     }, false);
@@ -133,26 +169,20 @@ function startCamera() {
 
 function startProcessing() {
     try {
-        logDebug("OpenCV obyektlari yaratilmoqda...");
+        log("OpenCV obyektlarini yaratish...");
         cap = new cv.VideoCapture(video);
-        src = new cv.Mat(videoHeight, videoWidth, cv.CV_8UC4);
-        dst = new cv.Mat(videoHeight, videoWidth, cv.CV_8UC1);
+        src = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+        dst = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC1);
 
-        // Agar ArUco bo'lmasa, bu yerda xato beradi
-        if (cv.aruco) {
-            arucoDict = new cv.aruco_Dictionary(cv.aruco.DICT_4X4_50);
-            arucoParams = new cv.aruco_DetectorParameters();
-            markerIds = new cv.Mat();
-            markerCorners = new cv.MatVector();
-        } else {
-            throw new Error("ArUco moduli yo'q. Iltimos OpenCV ni tekshiring.");
-        }
+        arucoDict = new cv.aruco_Dictionary(cv.aruco.DICT_4X4_50);
+        arucoParams = new cv.aruco_DetectorParameters();
+        markerIds = new cv.Mat();
+        markerCorners = new cv.MatVector();
 
-        logDebug("Tahlil boshlandi!");
+        log("Tahlil loopi boshlandi 🔄");
         requestAnimationFrame(processVideo);
-
-    } catch (err) {
-        logDebug("startProcessing error: " + err.message, true);
+    } catch (e) {
+        log("startProcessing Xatosi: " + e.message, true);
     }
 }
 
@@ -167,8 +197,6 @@ function processVideo() {
         cv.aruco.detectMarkers(dst, arucoDict, markerCorners, markerIds, arucoParams);
 
         if (markerIds.rows > 0) {
-            logDebug("Marker topildi! Soni: " + markerIds.rows);
-
             for (let i = 0; i < markerIds.rows; ++i) {
                 let id = markerIds.data32S[i];
                 let corners = markerCorners.get(i);
@@ -180,20 +208,25 @@ function processVideo() {
 
                 let answer = detectAnswer(tl, tr, br, bl);
 
+                // Chizish
                 drawMarker(src, tl, tr, br, bl, id, answer);
+
+                // Natijani saqlash
                 saveResult(id, answer);
             }
         }
 
+        // Ekranga (Canvasga) chiqarish
         cv.imshow('canvasOutput', src);
 
     } catch (err) {
-        logDebug("Loop error: " + err.message, true);
-        // Xato bo'lsa ham davom etsin, balki keyingi kadr o'xshar
+        // Har bir freymda xato chiqmasligi uchun logni kamaytirish mumkin
+        // log("Loop Error: " + err.message, true);
     }
 
     requestAnimationFrame(processVideo);
 }
+
 
 function detectAnswer(tl, tr, br, bl) {
     let points = [
@@ -215,7 +248,7 @@ function drawMarker(mat, tl, tr, br, bl, id, ans) {
     cv.line(mat, br, bl, color, thickness);
     cv.line(mat, bl, tl, color, thickness);
 
-    let text = `ID:${id} Ans:${ans}`;
+    let text = `${id}:${ans}`;
     let point = new cv.Point(tl.x, tl.y - 10);
     cv.putText(mat, text, point, cv.FONT_HERSHEY_SIMPLEX, 1.0, color, 2);
 }
@@ -231,7 +264,10 @@ function saveResult(id, ans) {
 function updateUI() {
     totalScannedEl.innerText = Object.keys(scannedResults).length;
     resultsList.innerHTML = "";
-    for (const [id, ans] of Object.entries(scannedResults)) {
+    // Oxirgi qo'shilgan yuqorida tursin
+    const keys = Object.keys(scannedResults).reverse();
+    for (const id of keys) {
+        let ans = scannedResults[id];
         let li = document.createElement("li");
         li.className = "result-item";
         li.innerHTML = `<span>ID: ${id}</span> <strong>${ans}</strong>`;
@@ -239,6 +275,7 @@ function updateUI() {
     }
 }
 
+// Memory Cleanup
 window.onunload = function () {
     if (src) src.delete();
     if (dst) dst.delete();
