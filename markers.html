@@ -4,107 +4,208 @@
 <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>ArUco Markerlar - Print</title>
+          <title>LLabQR — O'quvchi kartalari (Print)</title>
           <style>
+                    * {
+                              margin: 0;
+                              padding: 0;
+                              box-sizing: border-box;
+                    }
+
                     body {
                               font-family: Arial, sans-serif;
                               padding: 20px;
                               background: white;
+                              color: #333;
                     }
 
                     h1 {
                               text-align: center;
-                              color: #333;
+                              margin-bottom: 8px;
+                              font-size: 24px;
                     }
 
                     .info {
                               text-align: center;
                               color: #666;
-                              margin-bottom: 30px;
-                    }
-
-                    .markers-grid {
-                              display: grid;
-                              grid-template-columns: repeat(5, 1fr);
-                              gap: 20px;
-                              max-width: 900px;
-                              margin: 0 auto;
-                    }
-
-                    .marker-card {
-                              text-align: center;
-                              padding: 10px;
-                              border: 2px dashed #ccc;
-                              border-radius: 10px;
-                    }
-
-                    .marker-card h3 {
-                              margin: 5px 0;
+                              margin-bottom: 24px;
                               font-size: 14px;
                     }
 
-                    .marker-card canvas {
-                              border: 1px solid #000;
+                    .controls {
+                              text-align: center;
+                              margin-bottom: 24px;
                     }
 
-                    .answer-label {
-                              display: inline-block;
-                              padding: 5px 15px;
-                              margin-top: 5px;
-                              border-radius: 20px;
-                              font-weight: bold;
+                    .controls button {
+                              padding: 12px 28px;
+                              font-size: 16px;
+                              cursor: pointer;
+                              background: #6366f1;
                               color: white;
+                              border: none;
+                              border-radius: 10px;
+                              margin: 0 8px;
                     }
 
-                    .answer-A {
-                              background: #4CAF50;
+                    .controls button:hover {
+                              background: #4f46e5;
                     }
 
-                    .answer-B {
-                              background: #2196F3;
+                    .controls input {
+                              width: 60px;
+                              padding: 10px;
+                              font-size: 16px;
+                              text-align: center;
+                              border: 2px solid #ddd;
+                              border-radius: 8px;
                     }
 
-                    .answer-C {
-                              background: #FF9800;
+                    /* Print grid - 5 cards per row */
+                    .cards-grid {
+                              display: grid;
+                              grid-template-columns: repeat(5, 1fr);
+                              gap: 12px;
+                              max-width: 1000px;
+                              margin: 0 auto;
                     }
 
-                    .answer-D {
-                              background: #f44336;
+                    .card {
+                              border: 2px solid #333;
+                              border-radius: 8px;
+                              padding: 8px;
+                              text-align: center;
+                              page-break-inside: avoid;
+                              position: relative;
+                    }
+
+                    .card .student-id {
+                              font-size: 14px;
+                              font-weight: 900;
+                              margin-bottom: 6px;
+                              color: #1e293b;
+                    }
+
+                    .card canvas {
+                              display: block;
+                              margin: 0 auto;
+                    }
+
+                    /* A/B/C/D labels around the marker */
+                    .card .abcd-container {
+                              position: relative;
+                              width: 120px;
+                              height: 120px;
+                              margin: 0 auto;
+                    }
+
+                    .card .abcd-container canvas {
+                              position: absolute;
+                              top: 10px;
+                              left: 10px;
+                    }
+
+                    .abcd-label {
+                              position: absolute;
+                              font-weight: 900;
+                              font-size: 16px;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              width: 22px;
+                              height: 22px;
+                              border-radius: 4px;
+                    }
+
+                    .abcd-top {
+                              top: -4px;
+                              left: 50%;
+                              transform: translateX(-50%);
+                              background: #ef4444;
+                              color: #fff;
+                    }
+
+                    .abcd-right {
+                              right: -4px;
+                              top: 50%;
+                              transform: translateY(-50%);
+                              background: #3b82f6;
+                              color: #fff;
+                    }
+
+                    .abcd-bottom {
+                              bottom: -4px;
+                              left: 50%;
+                              transform: translateX(-50%);
+                              background: #f59e0b;
+                              color: #fff;
+                    }
+
+                    .abcd-left {
+                              left: -4px;
+                              top: 50%;
+                              transform: translateY(-50%);
+                              background: #22c55e;
+                              color: #fff;
+                    }
+
+                    .card .hint {
+                              font-size: 9px;
+                              color: #999;
+                              margin-top: 6px;
+                              line-height: 1.3;
+                    }
+
+                    /* Scissors line between cards for cutting */
+                    .cut-line {
+                              grid-column: 1 / -1;
+                              border-top: 1px dashed #ccc;
+                              margin: 4px 0;
                     }
 
                     @media print {
-                              .no-print {
+
+                              .controls,
+                              .info,
+                              h1 {
                                         display: none;
                               }
 
-                              .markers-grid {
-                                        gap: 10px;
+                              body {
+                                        padding: 10px;
+                              }
+
+                              .cards-grid {
+                                        gap: 8px;
+                              }
+
+                              .card {
+                                        border-width: 1px;
                               }
                     }
           </style>
 </head>
 
 <body>
-          <h1>🎯 LLabQR ArUco Markerlar</h1>
-          <p class="info">Bu markerlarni chop eting va o'quvchilarga tarqating. Har bir ID = 1 ta o'quvchi.</p>
+          <h1>🎯 LLabQR — O'quvchi kartalari</h1>
+          <p class="info">
+                    Har bir o'quvchiga bitta karta tarqating. Javob berish uchun kartani to'g'ri tomonga
+                    aylantiring.<br>
+                    <strong>A</strong> = yuqorida, <strong>B</strong> = o'ngda, <strong>C</strong> = pastda,
+                    <strong>D</strong> = chapda
+          </p>
 
-          <div class="no-print" style="text-align:center; margin-bottom:20px;">
-                    <button onclick="window.print()"
-                              style="padding:15px 30px; font-size:18px; cursor:pointer; background:#4CAF50; color:white; border:none; border-radius:10px;">
-                              🖨️ Chop etish (Print)
-                    </button>
+          <div class="controls">
+                    <label>O'quvchilar soni: </label>
+                    <input type="number" id="countInput" value="30" min="1" max="40">
+                    <button onclick="generateCards()">🔄 Kartalarni yaratish</button>
+                    <button onclick="window.print()">🖨️ Chop etish (Print)</button>
           </div>
 
-          <div id="markers-container" class="markers-grid"></div>
+          <div id="cardsContainer" class="cards-grid"></div>
 
           <script>
-                    // ArUco marker dictionary (5x5, standard markers that js-aruco recognizes)
-                    // These are valid marker IDs: 0-1023 for DICT_ARUCO_ORIGINAL
-                    const MARKER_SIZE = 100;
-                    const MARKER_IDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-
-                    // Valid 5x5 ArUco patterns (DICT_5X5_50)
-                    // Each marker has a unique binary pattern
+                    // ArUco 5x5 patterns (same as in app.js detector)
                     const patterns = {
                               0: [[1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [1, 0, 0, 0, 0]],
                               1: [[1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [1, 0, 1, 1, 1]],
@@ -125,67 +226,102 @@
                               16: [[1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0]],
                               17: [[1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1]],
                               18: [[0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1]],
-                              19: [[0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0]]
+                              19: [[0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0]],
+                              20: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0]],
+                              21: [[1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1]],
+                              22: [[0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1]],
+                              23: [[0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0]],
+                              24: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0]],
+                              25: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1]],
+                              26: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1]],
+                              27: [[0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0]],
+                              28: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0]],
+                              29: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1]]
                     };
 
-                    function drawMarker(id) {
+                    function drawMarker(id, size) {
                               const canvas = document.createElement('canvas');
-                              canvas.width = MARKER_SIZE;
-                              canvas.height = MARKER_SIZE;
+                              canvas.width = size;
+                              canvas.height = size;
                               const ctx = canvas.getContext('2d');
-
-                              const cellSize = MARKER_SIZE / 7;
+                              const cell = size / 7;
 
                               // Black border
-                              ctx.fillStyle = 'black';
-                              ctx.fillRect(0, 0, MARKER_SIZE, MARKER_SIZE);
+                              ctx.fillStyle = '#000';
+                              ctx.fillRect(0, 0, size, size);
 
-                              // White inner area
-                              ctx.fillStyle = 'white';
-                              ctx.fillRect(cellSize, cellSize, cellSize * 5, cellSize * 5);
+                              // White inner
+                              ctx.fillStyle = '#fff';
+                              ctx.fillRect(cell, cell, cell * 5, cell * 5);
 
-                              // Draw pattern
-                              const pattern = patterns[id] || patterns[0];
+                              // Pattern
+                              const p = patterns[id] || patterns[0];
                               for (let i = 0; i < 5; i++) {
                                         for (let j = 0; j < 5; j++) {
-                                                  if (pattern[i][j] === 1) {
-                                                            ctx.fillStyle = 'black';
-                                                  } else {
-                                                            ctx.fillStyle = 'white';
-                                                  }
-                                                  ctx.fillRect((j + 1) * cellSize, (i + 1) * cellSize, cellSize, cellSize);
+                                                  ctx.fillStyle = p[i][j] === 1 ? '#000' : '#fff';
+                                                  ctx.fillRect((j + 1) * cell, (i + 1) * cell, cell, cell);
                                         }
                               }
-
                               return canvas;
                     }
 
-                    function createMarkerCard(id) {
-                              const card = document.createElement('div');
-                              card.className = 'marker-card';
+                    function generateCards() {
+                              const count = Math.min(parseInt(document.getElementById('countInput').value) || 30, 40);
+                              const container = document.getElementById('cardsContainer');
+                              container.innerHTML = '';
 
-                              const canvas = drawMarker(id);
-                              const title = document.createElement('h3');
-                              title.textContent = `O'quvchi ID: ${id + 1}`;
+                              for (let i = 0; i < count; i++) {
+                                        const card = document.createElement('div');
+                                        card.className = 'card';
 
-                              card.appendChild(title);
-                              card.appendChild(canvas);
+                                        // Student number
+                                        const idDiv = document.createElement('div');
+                                        idDiv.className = 'student-id';
+                                        idDiv.textContent = `#${i + 1}`;
+                                        card.appendChild(idDiv);
 
-                              // Answer hint
-                              const hint = document.createElement('p');
-                              hint.style.fontSize = '11px';
-                              hint.style.color = '#888';
-                              hint.innerHTML = 'Aylantiring: ⬆️A ➡️B ⬇️C ⬅️D';
-                              card.appendChild(hint);
+                                        // ABCD container with marker
+                                        const abcdDiv = document.createElement('div');
+                                        abcdDiv.className = 'abcd-container';
 
-                              return card;
+                                        const marker = drawMarker(i, 100);
+                                        abcdDiv.appendChild(marker);
+
+                                        // ABCD labels
+                                        const labels = [
+                                                  { cls: 'abcd-label abcd-top', text: 'A' },
+                                                  { cls: 'abcd-label abcd-right', text: 'B' },
+                                                  { cls: 'abcd-label abcd-bottom', text: 'C' },
+                                                  { cls: 'abcd-label abcd-left', text: 'D' }
+                                        ];
+                                        labels.forEach(l => {
+                                                  const span = document.createElement('span');
+                                                  span.className = l.cls;
+                                                  span.textContent = l.text;
+                                                  abcdDiv.appendChild(span);
+                                        });
+
+                                        card.appendChild(abcdDiv);
+
+                                        // Hint
+                                        const hint = document.createElement('div');
+                                        hint.className = 'hint';
+                                        hint.innerHTML = '⬆A ➡B ⬇C ⬅D';
+                                        card.appendChild(hint);
+
+                                        container.appendChild(card);
+
+                                        // Cut line after every 5th row (every 25 cards)
+                                        if ((i + 1) % 25 === 0 && i < count - 1) {
+                                                  const cut = document.createElement('div');
+                                                  cut.className = 'cut-line';
+                                                  container.appendChild(cut);
+                                        }
+                              }
                     }
 
-                    // Generate markers
-                    const container = document.getElementById('markers-container');
-                    MARKER_IDS.forEach(id => {
-                              container.appendChild(createMarkerCard(id));
-                    });
+                    // Generate on load
+                    generateCards();
           </script>
 </body>
 
