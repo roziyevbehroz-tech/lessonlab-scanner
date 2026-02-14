@@ -1,6 +1,9 @@
 // ==========================================
-// SCANNER APP — SMART TESTER BOT
-// Uses external cv.js + aruco.js libraries
+// SCANNER APP — SMART TESTER BOT v4
+// Uses ORIGINAL cv.js + aruco.js from jcmellado
+// Edge-midpoint orientation + vote-based locking
+// Fixed: tg.sendData with compressed results
+// Fixed: independent question navigation
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -15,11 +18,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentQuestion = 0;
     let allResults = {};       // {questionIdx: {studentId: {answer, isCorrect, name}}}
     let currentScanResults = {};
-    let frameBuffers = {};
+    let voteBuffers = {};      // {studentId: {answer, count}}
+    let lockedAnswers = {};    // {studentId: answerLetter}
     let isProcessing = false;
     let currentStream = null;
     let availableCameras = [];
-    const BUFFER_SIZE = 5;
+
+    // === DETECTION SETTINGS ===
+    const VOTE_THRESHOLD = 12;
+    const MIN_MARKER_EDGE = 40;
     const ANSWER_LETTERS = ["A", "B", "C", "D"];
 
     // === DOM ===
@@ -27,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const scannerScreen = document.getElementById('scannerScreen');
     const leaderboardScreen = document.getElementById('leaderboardScreen');
 
-    // === LOAD TEST DATA FROM URL ===
+    // === LOAD TEST DATA ===
     function loadTestData() {
         const params = new URLSearchParams(window.location.search);
         const encoded = params.get('data');
@@ -40,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         if (!testData) {
-            // Demo mode
             testData = {
                 test_id: 0,
                 title: "Demo Test",
@@ -48,28 +54,59 @@ document.addEventListener('DOMContentLoaded', async function () {
                 students: [
                     { id: 1, name: "Ali Valiyev" },
                     { id: 2, name: "Vali Aliyev" },
-                    { id: 3, name: "Sardor Karimov" }
+                    { id: 3, name: "Sardor Karimov" },
+                    { id: 4, name: "Jasur Toshmatov" },
+                    { id: 5, name: "Dilshod Rahimov" }
                 ],
                 questions: [
-                    { text: "Father tarjimasi?", options: ["Ota", "Ona", "Aka", "Uka"], correct: 0 },
-                    { text: "Mother tarjimasi?", options: ["Ota", "Ona", "Aka", "Opacha"], correct: 1 }
+                    { text: "O'zbekistonning poytaxti qaysi?", options: ["Samarqand", "Toshkent", "Buxoro", "Namangan"], correct: 1 },
+                    { text: "O'zbekiston nechta viloyatdan iborat?", options: ["14", "12", "13", "15"], correct: 2 }
                 ]
             };
         }
 
-        // Fill session screen
         document.getElementById('sessionTitle').textContent = testData.title;
         document.getElementById('sessionClass').textContent = testData.class_name || '—';
         document.getElementById('sessionCount').textContent = testData.questions.length + ' ta';
         document.getElementById('sessionStudents').textContent = testData.students.length + ' ta';
     }
 
-    // === GET STUDENT NAME BY MARKER ID ===
+    // === STUDENT NAME ===
     function getStudentName(markerId) {
-        // ArUco marker ID 0 → student 1, ID 1 → student 2, etc.
         const studentNum = markerId + 1;
         const student = testData.students.find(s => s.id === studentNum);
         return student ? student.name : `#${studentNum}`;
+    }
+
+    // === MARKER EDGE LENGTH ===
+    function markerEdgeLength(corners) {
+        let totalLen = 0;
+        for (let i = 0; i < 4; i++) {
+            const j = (i + 1) % 4;
+            const dx = corners[i].x - corners[j].x;
+            const dy = corners[i].y - corners[j].y;
+            totalLen += Math.sqrt(dx * dx + dy * dy);
+        }
+        return totalLen / 4;
+    }
+
+    // === STABLE ORIENTATION DETECTION (edge midpoint) ===
+    function getAnswerFromOrientation(corners) {
+        const edgeMidY = [];
+        for (let i = 0; i < 4; i++) {
+            const j = (i + 1) % 4;
+            edgeMidY[i] = (corners[i].y + corners[j].y) / 2;
+        }
+
+        let topEdge = 0;
+        let minY = edgeMidY[0];
+        for (let i = 1; i < 4; i++) {
+            if (edgeMidY[i] < minY) {
+                minY = edgeMidY[i];
+                topEdge = i;
+            }
+        }
+        return topEdge;
     }
 
     // === START SCANNER ===
@@ -86,23 +123,24 @@ document.addEventListener('DOMContentLoaded', async function () {
     function showQuestion(idx) {
         if (idx < 0 || idx >= testData.questions.length) return;
 
-        // Save previous results before switching
         if (Object.keys(currentScanResults).length > 0) {
             allResults[currentQuestion] = { ...currentScanResults };
         }
 
         currentQuestion = idx;
-
-        // Load existing results for this question
         currentScanResults = allResults[idx] ? { ...allResults[idx] } : {};
-        frameBuffers = {};
+        voteBuffers = {};
+        lockedAnswers = {};
+
+        Object.entries(currentScanResults).forEach(([id, r]) => {
+            lockedAnswers[id] = r.answer;
+        });
 
         const q = testData.questions[idx];
         document.getElementById('current-q').textContent = idx + 1;
         document.getElementById('questionText').textContent = q.text;
         document.getElementById('correctLetter').textContent = ANSWER_LETTERS[q.correct];
 
-        // Update navigation
         document.getElementById('prev-question-btn').disabled = idx === 0;
         const isLast = idx === testData.questions.length - 1;
         document.getElementById('next-question-btn').textContent = isLast ? 'Oxirgi ➡️' : 'Keyingi ➡️';
@@ -119,7 +157,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const context = canvas.getContext('2d');
         const detector = new AR.Detector();
 
-        // Get cameras
         try {
             await navigator.mediaDevices.getUserMedia({ video: true });
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -133,7 +170,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                 cameraSelect.appendChild(opt);
             });
 
-            // Prefer back camera
             const back = availableCameras.find(c =>
                 c.label.toLowerCase().includes('back') ||
                 c.label.toLowerCase().includes('environment') ||
@@ -178,7 +214,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             startCamera(cameraSelect.value);
         });
 
-        // Video ready → set canvas dimensions + start detection
         video.addEventListener('loadedmetadata', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -191,7 +226,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         // === MAIN DETECTION LOOP ===
         function tick() {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                // Draw video frame
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -201,85 +235,106 @@ document.addEventListener('DOMContentLoaded', async function () {
                     const markers = detector.detect(imageData);
                     const q = testData.questions[currentQuestion];
                     const correctIdx = q.correct;
+                    const seenThisFrame = new Set();
 
                     markers.forEach(m => {
                         const c = m.corners;
-                        const markerId = m.id;          // ArUco ID (0-based)
-                        const studentId = markerId + 1;  // Student number (1-based)
+                        const markerId = m.id;
+                        const studentId = markerId + 1;
 
-                        // Detect answer from orientation: topmost corner = selected answer
-                        let minY = Infinity, topIdx = -1;
-                        c.forEach((p, i) => { if (p.y < minY) { minY = p.y; topIdx = i; } });
-                        const currentAns = ANSWER_LETTERS[topIdx] || "?";
-                        const answerIdx = topIdx;
+                        if (markerId < 0 || markerId >= 30) return;
+                        if (!testData.students.find(s => s.id === studentId)) return;
+                        if (seenThisFrame.has(studentId)) return;
+                        seenThisFrame.add(studentId);
 
-                        // Lock-in buffer (prevents flickering)
-                        if (!frameBuffers[studentId]) frameBuffers[studentId] = [];
-                        frameBuffers[studentId].push(currentAns);
-                        if (frameBuffers[studentId].length > BUFFER_SIZE) frameBuffers[studentId].shift();
+                        const edgeLen = markerEdgeLength(c);
+                        if (edgeLen < MIN_MARKER_EDGE) return;
 
-                        const isStable = frameBuffers[studentId].length >= BUFFER_SIZE &&
-                            frameBuffers[studentId].every(a => a === currentAns);
+                        const ansIdx = getAnswerFromOrientation(c);
+                        const currentAns = ANSWER_LETTERS[ansIdx];
 
-                        if (isStable) {
-                            const isCorrect = (answerIdx === correctIdx);
-                            drawMarkerBox(context, c, isCorrect, studentId, currentAns);
+                        if (lockedAnswers[studentId]) {
+                            const locked = lockedAnswers[studentId];
+                            const lockedIdx = ANSWER_LETTERS.indexOf(locked);
+                            drawMarkerBox(context, c, lockedIdx === correctIdx, studentId, locked, true);
+                            return;
+                        }
 
-                            if (!currentScanResults[studentId] || currentScanResults[studentId].answer !== currentAns) {
-                                currentScanResults[studentId] = {
-                                    answer: currentAns,
-                                    isCorrect: isCorrect,
-                                    name: getStudentName(markerId)
-                                };
-                                if (tg.HapticFeedback) {
-                                    tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
-                                }
-                                updateUI();
-                            }
+                        if (!voteBuffers[studentId]) {
+                            voteBuffers[studentId] = { answer: currentAns, count: 0 };
+                        }
+
+                        if (voteBuffers[studentId].answer === currentAns) {
+                            voteBuffers[studentId].count++;
                         } else {
-                            drawMarkerBox(context, c, null, studentId, currentAns);
+                            voteBuffers[studentId] = { answer: currentAns, count: 1 };
+                        }
+
+                        const voteCount = voteBuffers[studentId].count;
+                        const progress = Math.min(100, Math.round((voteCount / VOTE_THRESHOLD) * 100));
+
+                        if (voteCount >= VOTE_THRESHOLD) {
+                            lockedAnswers[studentId] = currentAns;
+                            const isCorrect = (ansIdx === correctIdx);
+
+                            currentScanResults[studentId] = {
+                                answer: currentAns,
+                                isCorrect: isCorrect,
+                                name: getStudentName(markerId)
+                            };
+
+                            if (tg.HapticFeedback) {
+                                tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
+                            }
+                            updateUI();
+                            drawMarkerBox(context, c, isCorrect, studentId, currentAns, true);
+                        } else {
+                            drawMarkerBox(context, c, null, studentId, `${currentAns} ${progress}%`, false);
                         }
                     });
                 } catch (e) {
-                    // Silent error — don't break the loop
                     console.error("Detection error:", e);
                 }
             }
             requestAnimationFrame(tick);
         }
 
-        // Draw colored box around detected marker
-        function drawMarkerBox(ctx, corners, isCorrect, id, ans) {
+        function drawMarkerBox(ctx, corners, isCorrect, id, ansText, locked) {
             const name = getStudentName(id - 1);
-            let color = "#888888";
-            let label = `${name}: ${ans} ...`;
+            let color, label, lineWidth;
 
-            if (isCorrect === true) { color = "#00ff00"; label = `${name}: ${ans} ✓`; }
-            else if (isCorrect === false) { color = "#ff4444"; label = `${name}: ${ans} ✗`; }
+            if (locked) {
+                color = isCorrect ? "#00ff00" : "#ff4444";
+                label = `${name}: ${ansText} ${isCorrect ? '✓' : '✗'}`;
+                lineWidth = 4;
+            } else {
+                color = "#ffaa00";
+                label = `${name}: ${ansText}`;
+                lineWidth = 2;
+            }
 
-            // Draw border
             ctx.strokeStyle = color;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = lineWidth;
             ctx.beginPath();
             ctx.moveTo(corners[0].x, corners[0].y);
-            corners.forEach(p => ctx.lineTo(p.x, p.y));
+            for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
             ctx.closePath();
             ctx.stroke();
 
-            // Fill semi-transparent
-            ctx.fillStyle = isCorrect === null ? "rgba(128,128,128,0.2)" :
-                (isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)");
-            ctx.fill();
+            if (locked) {
+                ctx.fillStyle = isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)";
+                ctx.fill();
+            }
 
-            // Label background
+            const x = Math.min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+            const y = Math.min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
             ctx.fillStyle = color;
-            ctx.font = "bold 18px Arial";
-            const textWidth = ctx.measureText(label).width;
-            ctx.fillRect(corners[0].x, corners[0].y - 30, textWidth + 10, 26);
+            ctx.font = "bold 14px Arial";
+            const tw = ctx.measureText(label).width;
+            ctx.fillRect(x, y - 22, tw + 8, 20);
 
-            // Label text
             ctx.fillStyle = "#000";
-            ctx.fillText(label, corners[0].x + 5, corners[0].y - 10);
+            ctx.fillText(label, x + 4, y - 6);
         }
 
         await startCamera(cameraSelect.value || null);
@@ -329,14 +384,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     function showLeaderboard() {
         allResults[currentQuestion] = { ...currentScanResults };
 
-        // Stop camera
         if (currentStream) currentStream.getTracks().forEach(t => t.stop());
         isProcessing = false;
 
         scannerScreen.classList.add('scanner-hidden');
         leaderboardScreen.classList.remove('scanner-hidden');
 
-        // Calculate scores
         const scores = {};
         Object.entries(allResults).forEach(([qIdx, results]) => {
             Object.entries(results).forEach(([studentId, r]) => {
@@ -346,7 +399,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             });
         });
 
-        // Sort by correct answers (descending)
         const sorted = Object.entries(scores)
             .sort(([, a], [, b]) => b.correct - a.correct);
 
@@ -371,17 +423,115 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
+    // === COMPRESS RESULTS FOR tg.sendData (4096 byte limit) ===
+    // Format: compact JSON with minimal keys
+    function compressResults() {
+        allResults[currentQuestion] = { ...currentScanResults };
+
+        // Build compact format: {t: test_id, r: {qIdx: {studentId: "A"/"B"/"C"/"D"}}}
+        const compact = {
+            a: "llab_qr_results",
+            t: testData.test_id,
+            n: testData.title,
+            q: testData.questions.length,
+            r: {}
+        };
+
+        // Store questions' correct answers for bot-side verification
+        const correctAnswers = {};
+        testData.questions.forEach((q, i) => {
+            correctAnswers[i] = q.correct;
+        });
+        compact.c = correctAnswers;
+
+        // Store student answers compactly: {qIdx: {studentId: answerIdx}}
+        Object.entries(allResults).forEach(([qIdx, results]) => {
+            compact.r[qIdx] = {};
+            Object.entries(results).forEach(([studentId, r]) => {
+                compact.r[qIdx][studentId] = ANSWER_LETTERS.indexOf(r.answer);
+            });
+        });
+
+        // Store student names once
+        compact.s = {};
+        Object.entries(allResults).forEach(([qIdx, results]) => {
+            Object.entries(results).forEach(([studentId, r]) => {
+                if (!compact.s[studentId]) {
+                    compact.s[studentId] = r.name;
+                }
+            });
+        });
+
+        return compact;
+    }
+
     // === SEND RESULTS TO BOT ===
     document.getElementById('sendResultsBtn').addEventListener('click', () => {
-        const data = {
-            action: "llab_qr_results",
-            test_id: testData.test_id,
-            title: testData.title,
-            total_questions: testData.questions.length,
-            results: allResults
-        };
-        tg.sendData(JSON.stringify(data));
-        tg.close();
+        const statusEl = document.getElementById('sendStatus');
+
+        try {
+            const compact = compressResults();
+            const jsonStr = JSON.stringify(compact);
+
+            // Check size
+            if (jsonStr.length > 4096) {
+                // Too large — split into essentials only
+                const minimal = {
+                    a: "llab_qr_results",
+                    t: compact.t,
+                    n: compact.n,
+                    q: compact.q,
+                    c: compact.c,
+                    r: compact.r,
+                    s: compact.s
+                };
+                const minStr = JSON.stringify(minimal);
+
+                if (minStr.length > 4096) {
+                    // Still too large — send just totals
+                    const totals = {
+                        a: "llab_qr_results",
+                        t: compact.t,
+                        n: compact.n,
+                        q: compact.q,
+                        // Send score summary only
+                        scores: {}
+                    };
+
+                    Object.entries(allResults).forEach(([qIdx, results]) => {
+                        Object.entries(results).forEach(([sid, r]) => {
+                            if (!totals.scores[sid]) {
+                                totals.scores[sid] = { n: r.name, c: 0, t: 0 };
+                            }
+                            totals.scores[sid].t++;
+                            if (r.isCorrect) totals.scores[sid].c++;
+                        });
+                    });
+
+                    tg.sendData(JSON.stringify(totals));
+                } else {
+                    tg.sendData(minStr);
+                }
+            } else {
+                tg.sendData(jsonStr);
+            }
+
+            if (statusEl) {
+                statusEl.textContent = "✅ Yuborildi!";
+                statusEl.style.color = "#22c55e";
+            }
+        } catch (e) {
+            if (statusEl) {
+                statusEl.textContent = "❌ Xatolik: " + e.message;
+                statusEl.style.color = "#ef4444";
+            }
+            console.error("sendData error:", e);
+        }
+
+        // Don't close immediately — let user see status
+        setTimeout(() => {
+            try { tg.close(); } catch (e) { }
+        }, 1500);
     });
 
     // === INIT ===
