@@ -281,6 +281,7 @@
         // Detection loop
         running = true;
         let frameNum = 0;
+        let lastMarkerLog = 0;
 
         function tick() {
             if (!running) return;
@@ -298,15 +299,22 @@
                         const markers = detector.detect(imageData);
 
                         frameNum++;
-                        if (frameNum % 120 === 0) {
-                            dbg('Frame ' + frameNum + ', markers: ' + markers.length);
+
+                        // Log every marker detection (throttled)
+                        if (markers.length > 0 && frameNum - lastMarkerLog > 30) {
+                            lastMarkerLog = frameNum;
+                            var ids = [];
+                            for (var mi = 0; mi < markers.length; mi++) {
+                                ids.push(markers[mi].id);
+                            }
+                            dbg('F' + frameNum + ': ' + markers.length + ' markers, IDs=[' + ids.join(',') + ']');
                         }
 
                         processMarkers(ctx, markers);
                     }
                 }
             } catch (e) {
-                if (frameNum % 60 === 0) dbg('Tick err: ' + e.message);
+                dbg('Tick err: ' + e.message);
             }
             requestAnimationFrame(tick);
         }
@@ -316,37 +324,44 @@
 
     // ════════════════════════════════════════
     // PROCESS DETECTED MARKERS
+    // NO filtering by student ID — ALL markers are processed!
     // ════════════════════════════════════════
     function processMarkers(ctx, markers) {
-        const q = testData.questions[currentQuestion];
-        const correctIdx = q.correct;
-        const seen = {};
+        if (markers.length === 0) return;
 
-        for (let i = 0; i < markers.length; i++) {
-            const m = markers[i];
-            const mid = m.id; // ArUco marker ID = student index
+        var q = testData.questions[currentQuestion];
+        if (!q) { dbg('ERROR: no question at index ' + currentQuestion); return; }
+        var correctIdx = q.correct;
+        var seen = {};
 
-            // Skip invalid or duplicate
-            if (!isValidStudent(mid)) continue;
+        for (var i = 0; i < markers.length; i++) {
+            var m = markers[i];
+            var mid = m.id;
+
+            // Skip duplicate only
             if (seen[mid]) continue;
             seen[mid] = true;
 
-            // Skip too small
-            if (avgEdgeLen(m.corners) < MIN_EDGE) continue;
+            // Measure size
+            var edge = avgEdgeLen(m.corners);
 
-            const name = studentName(mid);
+            // Skip if VERY small (less than 15px — nearly invisible)
+            if (edge < 15) continue;
+
+            // Get student name (or generic if outside range)
+            var name = studentName(mid);
 
             // ─── Already locked? Just redraw ───
             if (lockedAnswers[mid] !== undefined) {
-                const locked = lockedAnswers[mid];
-                const ok = (LETTERS.indexOf(locked) === correctIdx);
+                var locked = lockedAnswers[mid];
+                var ok = (LETTERS.indexOf(locked) === correctIdx);
                 drawBox(ctx, m.corners, name, locked, ok, true);
                 continue;
             }
 
-            // ─── Detect answer ───
-            const ansIdx = detectAnswer(m.corners);
-            const ans = LETTERS[ansIdx];
+            // ─── Detect answer from marker orientation ───
+            var ansIdx = detectAnswer(m.corners);
+            var ans = LETTERS[ansIdx];
 
             // ─── Vote system ───
             if (!voteBuffers[mid]) {
@@ -359,21 +374,21 @@
                 voteBuffers[mid] = { answer: ans, count: 1 };
             }
 
-            const pct = Math.min(100, Math.round((voteBuffers[mid].count / VOTE_THRESHOLD) * 100));
+            var pct = Math.min(100, Math.round((voteBuffers[mid].count / VOTE_THRESHOLD) * 100));
 
             if (voteBuffers[mid].count >= VOTE_THRESHOLD) {
                 // ── LOCK ──
                 lockedAnswers[mid] = ans;
-                const ok = (ansIdx === correctIdx);
-                currentScanResults[mid] = { answer: ans, isCorrect: ok, name: name };
+                var isOk = (ansIdx === correctIdx);
+                currentScanResults[mid] = { answer: ans, isCorrect: isOk, name: name };
                 refreshUI();
-                drawBox(ctx, m.corners, name, ans, ok, true);
-                dbg(name + ' → ' + ans + (ok ? ' ✓' : ' ✗'));
+                drawBox(ctx, m.corners, name, ans, isOk, true);
+                dbg('LOCK: ' + name + ' → ' + ans + (isOk ? ' ✓' : ' ✗') + ' (id=' + mid + ', edge=' + Math.round(edge) + ')');
 
                 // Haptic
-                try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(ok ? 'success' : 'error'); } catch (e) { }
+                try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(isOk ? 'success' : 'error'); } catch (e) { }
             } else {
-                // ── Scanning ──
+                // ── Scanning (orange) ──
                 drawBox(ctx, m.corners, name, ans + ' ' + pct + '%', null, false);
             }
         }
