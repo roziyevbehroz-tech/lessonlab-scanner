@@ -1,441 +1,450 @@
 // ==========================================
-// SCANNER APP — SMART TESTER BOT v5
-// Uses ORIGINAL cv.js + aruco.js from jcmellado
-// Edge-midpoint orientation + vote-based locking
-// FIXED: Student mapping by position, not DB id
-// FIXED: Compressed sendData for 4096 byte limit
+// SCANNER APP v6 — COMPLETE REWRITE
+// IIFE pattern — no DOMContentLoaded dependency
+// Built-in debug overlay for diagnostics
+// Maximum error resilience
 // ==========================================
 
-document.addEventListener('DOMContentLoaded', async function () {
+(function () {
+    'use strict';
 
-    // === TELEGRAM WEBAPP ===
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.ready();
+    // ─── DEBUG OVERLAY ───
+    // Shows diagnostic info directly on screen
+    const debugEl = document.getElementById('debugConsole');
+    function dbg(msg) {
+        console.log('[SCAN]', msg);
+        if (debugEl) {
+            debugEl.style.display = 'block';
+            debugEl.textContent = msg + '\n' + (debugEl.textContent || '').slice(0, 500);
+        }
+    }
 
-    // === DATA ===
+    // ─── TELEGRAM WEBAPP ───
+    let tg = null;
+    try {
+        tg = window.Telegram && window.Telegram.WebApp;
+        if (tg) { tg.expand(); tg.ready(); }
+        dbg('TG: ' + (tg ? 'ok' : 'null'));
+    } catch (e) {
+        dbg('TG init error: ' + e.message);
+    }
+
+    // ─── CHECK LIBRARIES ───
+    if (typeof CV === 'undefined') { dbg('ERROR: CV not loaded!'); return; }
+    if (typeof AR === 'undefined') { dbg('ERROR: AR not loaded!'); return; }
+    dbg('CV+AR loaded OK');
+
+    // ─── STATE ───
     let testData = null;
     let currentQuestion = 0;
-    let allResults = {};       // {questionIdx: {markerIdx: {answer, isCorrect, name}}}
+    let allResults = {};       // {qIdx: {markerIdx: {answer, isCorrect, name}}}
     let currentScanResults = {};
     let voteBuffers = {};      // {markerIdx: {answer, count}}
-    let lockedAnswers = {};    // {markerIdx: answerLetter}
-    let isProcessing = false;
-    let currentStream = null;
-    let availableCameras = [];
+    let lockedAnswers = {};    // {markerIdx: letter}
+    let running = false;
+    let cameraStream = null;
 
-    // === SETTINGS ===
+    // ─── SETTINGS ───
     const VOTE_THRESHOLD = 10;
-    const MIN_MARKER_EDGE = 30;
-    const ANSWER_LETTERS = ["A", "B", "C", "D"];
+    const MIN_EDGE = 25;
+    const LETTERS = ['A', 'B', 'C', 'D'];
 
-    // === DOM ===
-    const sessionScreen = document.getElementById('sessionScreen');
-    const scannerScreen = document.getElementById('scannerScreen');
-    const leaderboardScreen = document.getElementById('leaderboardScreen');
+    // ─── DOM ELEMENTS ───
+    const $ = id => document.getElementById(id);
+    const sessionScreen = $('sessionScreen');
+    const scannerScreen = $('scannerScreen');
+    const leaderboardScreen = $('leaderboardScreen');
+    const videoEl = $('videoInput');
+    const canvasEl = $('canvasOutput');
+    const loadingMsg = $('loadingMessage');
+    const cameraSelect = $('cameraSelect');
 
-    // === LOAD TEST DATA ===
+    // ════════════════════════════════════════
+    // LOAD & PARSE TEST DATA
+    // ════════════════════════════════════════
     function loadTestData() {
-        const params = new URLSearchParams(window.location.search);
-        const encoded = params.get('data');
-        if (encoded) {
-            try {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const encoded = params.get('data');
+            if (encoded) {
                 testData = JSON.parse(atob(encoded));
-            } catch (e) {
-                testData = null;
+                dbg('Data loaded: ' + testData.title + ', Q=' + testData.questions.length + ', S=' + testData.students.length);
             }
+        } catch (e) {
+            dbg('Data parse error: ' + e.message);
         }
 
         if (!testData) {
             testData = {
-                test_id: 0,
-                title: "Demo Test",
-                class_name: "Namuna sinf",
+                test_id: 0, title: "Demo Test", class_name: "Namuna",
                 students: [
-                    { id: 1, name: "Ali Valiyev" },
-                    { id: 2, name: "Vali Aliyev" },
-                    { id: 3, name: "Sardor Karimov" },
-                    { id: 4, name: "Jasur Toshmatov" },
-                    { id: 5, name: "Dilshod Rahimov" }
+                    { id: 1, name: "Ali" }, { id: 2, name: "Vali" },
+                    { id: 3, name: "Sardor" }, { id: 4, name: "Jasur" },
+                    { id: 5, name: "Dilshod" }
                 ],
                 questions: [
-                    { text: "O'zbekistonning poytaxti qaysi?", options: ["Samarqand", "Toshkent", "Buxoro", "Namangan"], correct: 1 },
-                    { text: "O'zbekiston nechta viloyatdan iborat?", options: ["14", "12", "13", "15"], correct: 2 }
+                    { text: "Poytaxt?", options: ["Samarqand", "Toshkent", "Buxoro", "Namangan"], correct: 1 },
+                    { text: "Viloyatlar?", options: ["14", "12", "13", "15"], correct: 2 }
                 ]
             };
+            dbg('Using DEMO data');
         }
 
-        document.getElementById('sessionTitle').textContent = testData.title;
-        document.getElementById('sessionClass').textContent = testData.class_name || '—';
-        document.getElementById('sessionCount').textContent = testData.questions.length + ' ta';
-        document.getElementById('sessionStudents').textContent = testData.students.length + ' ta';
+        $('sessionTitle').textContent = testData.title;
+        $('sessionClass').textContent = testData.class_name || '—';
+        $('sessionCount').textContent = testData.questions.length + ' ta';
+        $('sessionStudents').textContent = testData.students.length + ' ta';
     }
 
-    // === STUDENT NAME BY MARKER INDEX ===
-    // Marker #0 = 1st student, Marker #1 = 2nd student, etc.
-    // This is POSITION-BASED, NOT database-ID-based!
-    function getStudentByMarker(markerIdx) {
+    // ════════════════════════════════════════
+    // STUDENT MAPPING: Marker index → Student
+    // Marker #0 = students[0], Marker #1 = students[1], etc.
+    // ════════════════════════════════════════
+    function studentName(markerIdx) {
         if (markerIdx >= 0 && markerIdx < testData.students.length) {
-            return testData.students[markerIdx];
+            return testData.students[markerIdx].name;
         }
-        return null;
+        return '#' + (markerIdx + 1);
     }
 
-    function getStudentName(markerIdx) {
-        const student = getStudentByMarker(markerIdx);
-        return student ? student.name : `#${markerIdx + 1}`;
+    function isValidStudent(markerIdx) {
+        return markerIdx >= 0 && markerIdx < testData.students.length;
     }
 
-    // === MARKER EDGE LENGTH ===
-    function markerEdgeLength(corners) {
-        let totalLen = 0;
+    // ════════════════════════════════════════
+    // GEOMETRY HELPERS
+    // ════════════════════════════════════════
+    function avgEdgeLen(corners) {
+        let sum = 0;
         for (let i = 0; i < 4; i++) {
             const j = (i + 1) % 4;
             const dx = corners[i].x - corners[j].x;
             const dy = corners[i].y - corners[j].y;
-            totalLen += Math.sqrt(dx * dx + dy * dy);
+            sum += Math.sqrt(dx * dx + dy * dy);
         }
-        return totalLen / 4;
+        return sum / 4;
     }
 
-    // === ORIENTATION DETECTION (edge midpoint) ===
-    function getAnswerFromOrientation(corners) {
-        const edgeMidY = [];
+    // Determine which edge is on TOP → that's the answer
+    // Edge 0 (corner0→corner1) = A
+    // Edge 1 (corner1→corner2) = B
+    // Edge 2 (corner2→corner3) = C
+    // Edge 3 (corner3→corner0) = D
+    function detectAnswer(corners) {
+        let topEdge = 0;
+        let minMidY = Infinity;
         for (let i = 0; i < 4; i++) {
             const j = (i + 1) % 4;
-            edgeMidY[i] = (corners[i].y + corners[j].y) / 2;
-        }
-
-        let topEdge = 0;
-        let minY = edgeMidY[0];
-        for (let i = 1; i < 4; i++) {
-            if (edgeMidY[i] < minY) {
-                minY = edgeMidY[i];
+            const midY = (corners[i].y + corners[j].y) / 2;
+            if (midY < minMidY) {
+                minMidY = midY;
                 topEdge = i;
             }
         }
         return topEdge; // 0=A, 1=B, 2=C, 3=D
     }
 
-    // === START SCANNER ===
-    document.getElementById('startScannerBtn').addEventListener('click', () => {
-        sessionScreen.classList.add('scanner-hidden');
-        scannerScreen.classList.remove('scanner-hidden');
-        document.getElementById('scannerTitle').textContent = testData.title;
-        document.getElementById('total-q').textContent = testData.questions.length;
-        showQuestion(0);
-        initCamera();
-    });
-
-    // === SHOW QUESTION ===
+    // ════════════════════════════════════════
+    // SHOW QUESTION
+    // ════════════════════════════════════════
     function showQuestion(idx) {
         if (idx < 0 || idx >= testData.questions.length) return;
 
-        // Save current results
+        // Save previous
         if (Object.keys(currentScanResults).length > 0) {
-            allResults[currentQuestion] = { ...currentScanResults };
+            allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
         }
 
         currentQuestion = idx;
-        currentScanResults = allResults[idx] ? { ...allResults[idx] } : {};
+        currentScanResults = allResults[idx] ? JSON.parse(JSON.stringify(allResults[idx])) : {};
         voteBuffers = {};
         lockedAnswers = {};
 
-        // Restore locked answers
-        Object.entries(currentScanResults).forEach(([id, r]) => {
-            lockedAnswers[id] = r.answer;
-        });
+        // Restore locks
+        for (const [mid, r] of Object.entries(currentScanResults)) {
+            lockedAnswers[mid] = r.answer;
+        }
 
         const q = testData.questions[idx];
-        document.getElementById('current-q').textContent = idx + 1;
-        document.getElementById('questionText').textContent = q.text;
-        document.getElementById('correctLetter').textContent = ANSWER_LETTERS[q.correct];
+        $('current-q').textContent = idx + 1;
+        $('total-q').textContent = testData.questions.length;
+        $('questionText').textContent = q.text;
+        $('correctLetter').textContent = LETTERS[q.correct];
+        $('scannerTitle').textContent = testData.title;
 
-        document.getElementById('prev-question-btn').disabled = idx === 0;
-        const isLast = idx === testData.questions.length - 1;
-        document.getElementById('next-question-btn').textContent = isLast ? 'Oxirgi ➡️' : 'Keyingi ➡️';
+        $('prev-question-btn').disabled = (idx === 0);
+        $('next-question-btn').textContent = (idx === testData.questions.length - 1) ? 'Oxirgi ➡️' : 'Keyingi ➡️';
 
-        updateUI();
+        refreshUI();
+        dbg('Q' + (idx + 1) + '/' + testData.questions.length + ': ' + q.text.slice(0, 30));
     }
 
-    // === CAMERA ===
-    async function initCamera() {
-        const video = document.getElementById('videoInput');
-        const canvas = document.getElementById('canvasOutput');
-        const loadingMsg = document.getElementById('loadingMessage');
-        const cameraSelect = document.getElementById('cameraSelect');
-        const context = canvas.getContext('2d');
-        const detector = new AR.Detector();
+    // ════════════════════════════════════════
+    // UI UPDATE
+    // ════════════════════════════════════════
+    function refreshUI() {
+        const entries = Object.entries(currentScanResults);
+        const correct = entries.filter(([, r]) => r.isCorrect).length;
+        const wrong = entries.filter(([, r]) => !r.isCorrect).length;
 
+        $('correct-count').textContent = correct;
+        $('wrong-count').textContent = wrong;
+        $('total-scanned').textContent = entries.length;
+
+        const list = $('results-list');
+        list.innerHTML = '';
+        entries.forEach(([, r]) => {
+            const li = document.createElement('li');
+            li.className = 'result-item ' + (r.isCorrect ? 'correct' : 'wrong');
+            li.innerHTML = '<span>' + r.name + '</span> <strong>' + r.answer + '</strong> ' + (r.isCorrect ? '✅' : '❌');
+            list.appendChild(li);
+        });
+    }
+
+    // ════════════════════════════════════════
+    // CAMERA INIT & DETECTION LOOP
+    // ════════════════════════════════════════
+    async function startScanner() {
+        dbg('Starting camera...');
+        const ctx = canvasEl.getContext('2d');
+        let detector;
         try {
-            await navigator.mediaDevices.getUserMedia({ video: true });
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            availableCameras = devices.filter(d => d.kind === 'videoinput');
-
-            cameraSelect.innerHTML = '';
-            availableCameras.forEach((cam, i) => {
-                const opt = document.createElement('option');
-                opt.value = cam.deviceId;
-                opt.textContent = cam.label || `Kamera ${i + 1}`;
-                cameraSelect.appendChild(opt);
-            });
-
-            const back = availableCameras.find(c =>
-                c.label.toLowerCase().includes('back') ||
-                c.label.toLowerCase().includes('environment') ||
-                c.label.toLowerCase().includes('rear')
-            );
-            if (back) cameraSelect.value = back.deviceId;
+            detector = new AR.Detector();
+            dbg('Detector created OK');
         } catch (e) {
-            loadingMsg.textContent = "⚠️ Kamera ruxsati berilmadi!";
+            dbg('Detector create error: ' + e.message);
             return;
         }
 
-        async function startCamera(deviceId) {
-            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+        // Enumerate cameras
+        try {
+            // Need initial getUserMedia to get labels
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(t => t.stop());
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const cams = devices.filter(d => d.kind === 'videoinput');
+            dbg('Cameras found: ' + cams.length);
+
+            cameraSelect.innerHTML = '';
+            cams.forEach((c, i) => {
+                const opt = document.createElement('option');
+                opt.value = c.deviceId;
+                opt.textContent = c.label || ('Kamera ' + (i + 1));
+                cameraSelect.appendChild(opt);
+            });
+
+            // Prefer back camera
+            const back = cams.find(c => /back|rear|environment/i.test(c.label));
+            if (back) cameraSelect.value = back.deviceId;
+        } catch (e) {
+            dbg('Camera enum error: ' + e.message);
+            if (loadingMsg) loadingMsg.textContent = '⚠️ Kamera ruxsati berilmadi!';
+            return;
+        }
+
+        // Start camera with selected device
+        async function openCamera(deviceId) {
+            if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+
             const constraints = {
                 audio: false,
                 video: deviceId
                     ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
                     : { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
             };
+
             try {
-                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = currentStream;
-                await video.play();
-                loadingMsg.style.display = 'none';
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
             } catch (e) {
-                try {
-                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    video.srcObject = currentStream;
-                    await video.play();
-                    loadingMsg.style.display = 'none';
-                } catch (e2) {
-                    loadingMsg.textContent = "❌ Kamera ochilmadi!";
-                }
+                dbg('Camera open fallback...');
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
             }
+
+            videoEl.srcObject = cameraStream;
+            await videoEl.play();
+            if (loadingMsg) loadingMsg.style.display = 'none';
+            dbg('Camera opened: ' + videoEl.videoWidth + 'x' + videoEl.videoHeight);
         }
 
-        cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
-        document.getElementById('switchCameraBtn').addEventListener('click', () => {
-            const idx = availableCameras.findIndex(c => c.deviceId === cameraSelect.value);
-            const next = (idx + 1) % availableCameras.length;
-            cameraSelect.value = availableCameras[next]?.deviceId || '';
-            startCamera(cameraSelect.value);
-        });
+        cameraSelect.onchange = function () { openCamera(cameraSelect.value); };
+        $('switchCameraBtn').onclick = function () {
+            const opts = cameraSelect.options;
+            const cur = cameraSelect.selectedIndex;
+            cameraSelect.selectedIndex = (cur + 1) % opts.length;
+            openCamera(cameraSelect.value);
+        };
 
-        video.addEventListener('loadedmetadata', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            if (!isProcessing) {
-                isProcessing = true;
-                requestAnimationFrame(tick);
-            }
-        });
+        // Wait for video metadata
+        await openCamera(cameraSelect.value || null);
 
-        // === MAIN DETECTION LOOP ===
+        // Detection loop
+        running = true;
+        let frameNum = 0;
+
         function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            if (!running) return;
 
-                try {
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    const markers = detector.detect(imageData);
-                    const q = testData.questions[currentQuestion];
-                    const correctIdx = q.correct;
-                    const seenThisFrame = new Set();
-                    const maxStudents = testData.students.length;
+            try {
+                if (videoEl.readyState >= videoEl.HAVE_ENOUGH_DATA) {
+                    const w = videoEl.videoWidth;
+                    const h = videoEl.videoHeight;
+                    if (w > 0 && h > 0) {
+                        canvasEl.width = w;
+                        canvasEl.height = h;
+                        ctx.drawImage(videoEl, 0, 0, w, h);
 
-                    markers.forEach(m => {
-                        const c = m.corners;
-                        const markerIdx = m.id; // ArUco marker ID = index in students array
+                        const imageData = ctx.getImageData(0, 0, w, h);
+                        const markers = detector.detect(imageData);
 
-                        // === FILTER: Valid student index ===
-                        // Marker #0 = 1st student, #1 = 2nd student, etc.
-                        if (markerIdx < 0 || markerIdx >= maxStudents) return;
-                        if (seenThisFrame.has(markerIdx)) return;
-                        seenThisFrame.add(markerIdx);
-
-                        // === FILTER: Minimum size ===
-                        const edgeLen = markerEdgeLength(c);
-                        if (edgeLen < MIN_MARKER_EDGE) return;
-
-                        // === DETECT ANSWER ===
-                        const ansIdx = getAnswerFromOrientation(c);
-                        const currentAns = ANSWER_LETTERS[ansIdx];
-                        const studentName = getStudentName(markerIdx);
-
-                        // === Already locked? ===
-                        if (lockedAnswers[markerIdx] !== undefined) {
-                            const locked = lockedAnswers[markerIdx];
-                            const lockedIdx = ANSWER_LETTERS.indexOf(locked);
-                            drawMarkerBox(context, c, lockedIdx === correctIdx, studentName, locked, true);
-                            return;
+                        frameNum++;
+                        if (frameNum % 120 === 0) {
+                            dbg('Frame ' + frameNum + ', markers: ' + markers.length);
                         }
 
-                        // === VOTE (consecutive same-answer) ===
-                        if (!voteBuffers[markerIdx]) {
-                            voteBuffers[markerIdx] = { answer: currentAns, count: 0 };
-                        }
-
-                        if (voteBuffers[markerIdx].answer === currentAns) {
-                            voteBuffers[markerIdx].count++;
-                        } else {
-                            voteBuffers[markerIdx] = { answer: currentAns, count: 1 };
-                        }
-
-                        const voteCount = voteBuffers[markerIdx].count;
-                        const progress = Math.min(100, Math.round((voteCount / VOTE_THRESHOLD) * 100));
-
-                        if (voteCount >= VOTE_THRESHOLD) {
-                            // LOCK!
-                            lockedAnswers[markerIdx] = currentAns;
-                            const isCorrect = (ansIdx === correctIdx);
-
-                            currentScanResults[markerIdx] = {
-                                answer: currentAns,
-                                isCorrect: isCorrect,
-                                name: studentName
-                            };
-
-                            if (tg.HapticFeedback) {
-                                tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
-                            }
-                            updateUI();
-                            drawMarkerBox(context, c, isCorrect, studentName, currentAns, true);
-                        } else {
-                            // Still scanning...
-                            drawMarkerBox(context, c, null, studentName, `${currentAns} ${progress}%`, false);
-                        }
-                    });
-                } catch (e) {
-                    console.error("Detection error:", e);
+                        processMarkers(ctx, markers);
+                    }
                 }
+            } catch (e) {
+                if (frameNum % 60 === 0) dbg('Tick err: ' + e.message);
             }
             requestAnimationFrame(tick);
         }
 
-        // Draw overlay on detected marker
-        function drawMarkerBox(ctx, corners, isCorrect, name, ansText, locked) {
-            let color, label, lineWidth;
+        tick();
+    }
 
-            if (locked) {
-                color = isCorrect ? "#00ff00" : "#ff4444";
-                label = `${name}: ${ansText} ${isCorrect ? '✓' : '✗'}`;
-                lineWidth = 4;
+    // ════════════════════════════════════════
+    // PROCESS DETECTED MARKERS
+    // ════════════════════════════════════════
+    function processMarkers(ctx, markers) {
+        const q = testData.questions[currentQuestion];
+        const correctIdx = q.correct;
+        const seen = {};
+
+        for (let i = 0; i < markers.length; i++) {
+            const m = markers[i];
+            const mid = m.id; // ArUco marker ID = student index
+
+            // Skip invalid or duplicate
+            if (!isValidStudent(mid)) continue;
+            if (seen[mid]) continue;
+            seen[mid] = true;
+
+            // Skip too small
+            if (avgEdgeLen(m.corners) < MIN_EDGE) continue;
+
+            const name = studentName(mid);
+
+            // ─── Already locked? Just redraw ───
+            if (lockedAnswers[mid] !== undefined) {
+                const locked = lockedAnswers[mid];
+                const ok = (LETTERS.indexOf(locked) === correctIdx);
+                drawBox(ctx, m.corners, name, locked, ok, true);
+                continue;
+            }
+
+            // ─── Detect answer ───
+            const ansIdx = detectAnswer(m.corners);
+            const ans = LETTERS[ansIdx];
+
+            // ─── Vote system ───
+            if (!voteBuffers[mid]) {
+                voteBuffers[mid] = { answer: ans, count: 0 };
+            }
+
+            if (voteBuffers[mid].answer === ans) {
+                voteBuffers[mid].count++;
             } else {
-                color = "#ffaa00";
-                label = `${name}: ${ansText}`;
-                lineWidth = 2;
+                voteBuffers[mid] = { answer: ans, count: 1 };
             }
 
-            // Draw border
-            ctx.strokeStyle = color;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            ctx.moveTo(corners[0].x, corners[0].y);
-            for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
-            ctx.closePath();
-            ctx.stroke();
+            const pct = Math.min(100, Math.round((voteBuffers[mid].count / VOTE_THRESHOLD) * 100));
 
-            // Fill
-            if (locked) {
-                ctx.fillStyle = isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)";
-                ctx.fill();
+            if (voteBuffers[mid].count >= VOTE_THRESHOLD) {
+                // ── LOCK ──
+                lockedAnswers[mid] = ans;
+                const ok = (ansIdx === correctIdx);
+                currentScanResults[mid] = { answer: ans, isCorrect: ok, name: name };
+                refreshUI();
+                drawBox(ctx, m.corners, name, ans, ok, true);
+                dbg(name + ' → ' + ans + (ok ? ' ✓' : ' ✗'));
+
+                // Haptic
+                try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(ok ? 'success' : 'error'); } catch (e) { }
+            } else {
+                // ── Scanning ──
+                drawBox(ctx, m.corners, name, ans + ' ' + pct + '%', null, false);
             }
-
-            // Label background
-            const x = Math.min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
-            const y = Math.min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
-            ctx.fillStyle = color;
-            ctx.font = "bold 14px Arial";
-            const tw = ctx.measureText(label).width;
-            ctx.fillRect(x, y - 22, tw + 8, 20);
-
-            ctx.fillStyle = "#000";
-            ctx.fillText(label, x + 4, y - 6);
         }
-
-        await startCamera(cameraSelect.value || null);
     }
 
-    // === UI UPDATE ===
-    function updateUI() {
-        const results = Object.entries(currentScanResults);
-        const correct = results.filter(([, r]) => r.isCorrect).length;
-        const wrong = results.filter(([, r]) => !r.isCorrect).length;
+    // ════════════════════════════════════════
+    // DRAW OVERLAY BOX ON MARKER
+    // ════════════════════════════════════════
+    function drawBox(ctx, corners, name, text, isCorrect, locked) {
+        const color = locked ? (isCorrect ? '#00ff00' : '#ff3333') : '#ffaa00';
+        const lw = locked ? 4 : 2;
+        const label = name + ': ' + text + (locked ? (isCorrect ? ' ✓' : ' ✗') : '');
 
-        document.getElementById('correct-count').textContent = correct;
-        document.getElementById('wrong-count').textContent = wrong;
-        document.getElementById('total-scanned').textContent = results.length;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < 4; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath();
+        ctx.stroke();
 
-        const list = document.getElementById('results-list');
-        list.innerHTML = "";
-        results.forEach(([id, r]) => {
-            const li = document.createElement("li");
-            li.className = `result-item ${r.isCorrect ? 'correct' : 'wrong'}`;
-            li.innerHTML = `<span>${r.name}</span> <strong>${r.answer}</strong> ${r.isCorrect ? '✅' : '❌'}`;
-            list.appendChild(li);
-        });
+        if (locked) {
+            ctx.fillStyle = isCorrect ? 'rgba(0,255,0,0.12)' : 'rgba(255,0,0,0.12)';
+            ctx.fill();
+        }
+
+        // Label
+        const x = Math.min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+        const y = Math.min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+        ctx.font = 'bold 14px sans-serif';
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y - 20, tw + 6, 18);
+        ctx.fillStyle = '#000';
+        ctx.fillText(label, x + 3, y - 5);
     }
 
-    // === NAVIGATION ===
-    document.getElementById('next-question-btn').addEventListener('click', () => {
-        allResults[currentQuestion] = { ...currentScanResults };
-        if (currentQuestion >= testData.questions.length - 1) {
-            showLeaderboard();
-        } else {
-            showQuestion(currentQuestion + 1);
-        }
-    });
-
-    document.getElementById('prev-question-btn').addEventListener('click', () => {
-        allResults[currentQuestion] = { ...currentScanResults };
-        if (currentQuestion > 0) showQuestion(currentQuestion - 1);
-    });
-
-    document.getElementById('finish-test-btn').addEventListener('click', () => {
-        allResults[currentQuestion] = { ...currentScanResults };
-        showLeaderboard();
-    });
-
-    // === LEADERBOARD ===
+    // ════════════════════════════════════════
+    // LEADERBOARD
+    // ════════════════════════════════════════
     function showLeaderboard() {
-        allResults[currentQuestion] = { ...currentScanResults };
-
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-        isProcessing = false;
+        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+        running = false;
+        if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
 
         scannerScreen.classList.add('scanner-hidden');
         leaderboardScreen.classList.remove('scanner-hidden');
 
         const scores = {};
-        Object.entries(allResults).forEach(([qIdx, results]) => {
-            Object.entries(results).forEach(([markerIdx, r]) => {
-                if (!scores[markerIdx]) scores[markerIdx] = { name: r.name, correct: 0, total: 0 };
-                scores[markerIdx].total++;
-                if (r.isCorrect) scores[markerIdx].correct++;
-            });
-        });
+        for (const [, results] of Object.entries(allResults)) {
+            for (const [mid, r] of Object.entries(results)) {
+                if (!scores[mid]) scores[mid] = { name: r.name, correct: 0, total: 0 };
+                scores[mid].total++;
+                if (r.isCorrect) scores[mid].correct++;
+            }
+        }
 
-        const sorted = Object.entries(scores)
-            .sort(([, a], [, b]) => b.correct - a.correct);
-
-        const list = document.getElementById('lbList');
-        list.innerHTML = '';
+        const sorted = Object.entries(scores).sort(([, a], [, b]) => b.correct - a.correct);
         const medals = ['🥇', '🥈', '🥉'];
+        const list = $('lbList');
+        list.innerHTML = '';
 
-        sorted.forEach(([id, s], i) => {
+        sorted.forEach(([, s], i) => {
             const row = document.createElement('div');
             row.className = 'lb-row';
-            const pct = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0;
-            row.innerHTML = `
-                <div class="lb-rank">${i < 3 ? medals[i] : (i + 1)}</div>
-                <div class="lb-name">${s.name}</div>
-                <div class="lb-score">${s.correct}/${testData.questions.length} (${pct}%)</div>
-            `;
+            const pct = testData.questions.length > 0
+                ? Math.round((s.correct / testData.questions.length) * 100) : 0;
+            row.innerHTML =
+                '<div class="lb-rank">' + (i < 3 ? medals[i] : (i + 1)) + '</div>' +
+                '<div class="lb-name">' + s.name + '</div>' +
+                '<div class="lb-score">' + s.correct + '/' + testData.questions.length + ' (' + pct + '%)</div>';
             list.appendChild(row);
         });
 
@@ -444,86 +453,102 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
-    // === SEND RESULTS TO BOT (compressed for 4096 byte limit) ===
-    document.getElementById('sendResultsBtn').addEventListener('click', () => {
-        const statusEl = document.getElementById('sendStatus');
+    // ════════════════════════════════════════
+    // SEND RESULTS TO BOT (compressed)
+    // ════════════════════════════════════════
+    function sendResults() {
+        const statusEl = $('sendStatus');
 
         try {
-            allResults[currentQuestion] = { ...currentScanResults };
+            allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
 
-            // Build compact format
-            const compact = {
-                a: "llab_qr_results",
+            // Build compact JSON
+            const data = {
+                a: 'llab_qr_results',
                 t: testData.test_id,
                 n: testData.title,
                 q: testData.questions.length,
-                c: {},  // correct answers per question
-                r: {},  // {qIdx: {markerIdx: answerIdx}}
-                s: {}   // {markerIdx: studentName}
+                c: {}, r: {}, s: {}
             };
 
-            // Correct answers
-            testData.questions.forEach((q, i) => {
-                compact.c[i] = q.correct;
-            });
+            testData.questions.forEach(function (q, i) { data.c[i] = q.correct; });
 
-            // Student answers and names
-            Object.entries(allResults).forEach(([qIdx, results]) => {
-                compact.r[qIdx] = {};
-                Object.entries(results).forEach(([markerIdx, r]) => {
-                    compact.r[qIdx][markerIdx] = ANSWER_LETTERS.indexOf(r.answer);
-                    if (!compact.s[markerIdx]) {
-                        compact.s[markerIdx] = r.name;
+            for (const [qIdx, results] of Object.entries(allResults)) {
+                data.r[qIdx] = {};
+                for (const [mid, r] of Object.entries(results)) {
+                    data.r[qIdx][mid] = LETTERS.indexOf(r.answer);
+                    if (!data.s[mid]) data.s[mid] = r.name;
+                }
+            }
+
+            let payload = JSON.stringify(data);
+            dbg('Payload size: ' + payload.length + ' bytes');
+
+            // If too large, send just scores
+            if (payload.length > 4000) {
+                const mini = { a: 'llab_qr_results', t: data.t, n: data.n, q: data.q, scores: {} };
+                for (const [, results] of Object.entries(allResults)) {
+                    for (const [mid, r] of Object.entries(results)) {
+                        if (!mini.scores[mid]) mini.scores[mid] = { n: r.name, c: 0, t: 0 };
+                        mini.scores[mid].t++;
+                        if (r.isCorrect) mini.scores[mid].c++;
                     }
-                });
-            });
+                }
+                payload = JSON.stringify(mini);
+                dbg('Using mini payload: ' + payload.length + ' bytes');
+            }
 
-            const jsonStr = JSON.stringify(compact);
-
-            if (jsonStr.length > 4096) {
-                // Too large — send scores only
-                const totals = {
-                    a: "llab_qr_results",
-                    t: compact.t,
-                    n: compact.n,
-                    q: compact.q,
-                    scores: {}
-                };
-
-                Object.entries(allResults).forEach(([qIdx, results]) => {
-                    Object.entries(results).forEach(([mid, r]) => {
-                        if (!totals.scores[mid]) {
-                            totals.scores[mid] = { n: r.name, c: 0, t: 0 };
-                        }
-                        totals.scores[mid].t++;
-                        if (r.isCorrect) totals.scores[mid].c++;
-                    });
-                });
-
-                tg.sendData(JSON.stringify(totals));
+            if (tg && tg.sendData) {
+                tg.sendData(payload);
+                if (statusEl) { statusEl.textContent = '✅ Yuborildi!'; statusEl.style.color = '#22c55e'; }
+                dbg('sendData OK');
+                setTimeout(function () { try { tg.close(); } catch (e) { } }, 1500);
             } else {
-                tg.sendData(jsonStr);
+                dbg('tg.sendData not available');
+                if (statusEl) { statusEl.textContent = '⚠️ Telegram WebApp topilmadi'; statusEl.style.color = '#ff0'; }
             }
-
-            if (statusEl) {
-                statusEl.textContent = "✅ Natijalar botga yuborildi!";
-                statusEl.style.color = "#22c55e";
-            }
-
-            // Close after short delay
-            setTimeout(() => {
-                try { tg.close(); } catch (e) { }
-            }, 1500);
-
         } catch (e) {
-            console.error("Send error:", e);
-            if (statusEl) {
-                statusEl.textContent = "❌ Xatolik: " + e.message;
-                statusEl.style.color = "#ef4444";
-            }
+            dbg('Send error: ' + e.message);
+            if (statusEl) { statusEl.textContent = '❌ Xatolik: ' + e.message; statusEl.style.color = '#f00'; }
         }
-    });
+    }
 
-    // === INIT ===
+    // ════════════════════════════════════════
+    // EVENT LISTENERS
+    // ════════════════════════════════════════
+    $('startScannerBtn').onclick = function () {
+        sessionScreen.classList.add('scanner-hidden');
+        scannerScreen.classList.remove('scanner-hidden');
+        showQuestion(0);
+        startScanner();
+    };
+
+    $('next-question-btn').onclick = function () {
+        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+        if (currentQuestion >= testData.questions.length - 1) {
+            showLeaderboard();
+        } else {
+            showQuestion(currentQuestion + 1);
+        }
+    };
+
+    $('prev-question-btn').onclick = function () {
+        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+        if (currentQuestion > 0) showQuestion(currentQuestion - 1);
+    };
+
+    $('finish-test-btn').onclick = function () {
+        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+        showLeaderboard();
+    };
+
+    $('sendResultsBtn').onclick = sendResults;
+
+    // ════════════════════════════════════════
+    // INIT
+    // ════════════════════════════════════════
+    dbg('App v6 init');
     loadTestData();
-});
+    dbg('Ready. Press Start.');
+
+})();
