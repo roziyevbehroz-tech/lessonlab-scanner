@@ -21,12 +21,13 @@ CV.Image = function (width, height, data) {
 };
 
 CV.grayscale = function (imageSrc, imageDst) {
-          var src = imageSrc.data, dst = imageDst.data, len = src.length,
+          var src = imageSrc.data, len = src.length,
                     i = 0, j = 0;
 
           imageDst.width = imageSrc.width;
           imageDst.height = imageSrc.height;
           imageDst.data = [];
+          var dst = imageDst.data;
 
           for (; i < len; i += 4) {
                     dst[j++] = (src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114 + 0.5) & 0xff;
@@ -34,11 +35,12 @@ CV.grayscale = function (imageSrc, imageDst) {
 };
 
 CV.threshold = function (imageSrc, imageDst, threshold) {
-          var src = imageSrc.data, dst = imageDst.data, len = src.length, tab = [], i;
+          var src = imageSrc.data, len = src.length, tab = [], i;
 
           imageDst.width = imageSrc.width;
           imageDst.height = imageSrc.height;
           imageDst.data = [];
+          var dst = imageDst.data;
 
           for (i = 0; i < 256; ++i) {
                     tab[i] = i <= threshold ? 0 : 255;
@@ -49,13 +51,14 @@ CV.threshold = function (imageSrc, imageDst, threshold) {
 };
 
 CV.adaptiveThreshold = function (imageSrc, imageDst, kernelSize, threshold) {
-          var src = imageSrc.data, dst = imageDst.data, len = src.length, tab = [], i;
+          var src = imageSrc.data, len = src.length, tab = [], i;
 
           imageDst.width = imageSrc.width;
           imageDst.height = imageSrc.height;
-          imageDst.data = [];
 
           CV.stackBoxBlur(imageSrc, imageDst, kernelSize);
+
+          var dst = imageDst.data;
 
           for (i = 0; i < 768; ++i) {
                     tab[i] = (i - 255 <= -threshold) ? 255 : 0;
@@ -110,7 +113,7 @@ CV.BlurStack = function () {
 };
 
 CV.stackBoxBlur = function (imageSrc, imageDst, kernelSize) {
-          var src = imageSrc.data, dst = imageDst.data,
+          var src = imageSrc.data,
                     height = imageSrc.height, width = imageSrc.width,
                     heightMinus1 = height - 1, widthMinus1 = width - 1,
                     size = kernelSize + kernelSize + 1, radius = kernelSize + 1,
@@ -121,6 +124,7 @@ CV.stackBoxBlur = function (imageSrc, imageDst, kernelSize) {
           imageDst.width = width;
           imageDst.height = height;
           imageDst.data = [];
+          var dst = imageDst.data;
 
           stack = stackStart = new CV.BlurStack();
           for (i = 1; i < size; ++i) {
@@ -414,7 +418,7 @@ CV.minEdgeLength = function (poly) {
 };
 
 CV.warp = function (imageSrc, imageDst, contour, warpSize) {
-          var src = imageSrc.data, dst = imageDst.data,
+          var src = imageSrc.data,
                     width = imageSrc.width, height = imageSrc.height,
                     pos = 0, sx1, sx2, dx1, dx2, sy1, sy2, dy1, dy2, p1, p2, p3, p4,
                     m, r, s, t, u, v, w, x, y, i, j;
@@ -422,6 +426,7 @@ CV.warp = function (imageSrc, imageDst, contour, warpSize) {
           imageDst.width = warpSize;
           imageDst.height = warpSize;
           imageDst.data = [];
+          var dst = imageDst.data;
 
           sx1 = contour[0].x; sy1 = contour[0].y;
           sx2 = contour[1].x; sy2 = contour[1].y;
