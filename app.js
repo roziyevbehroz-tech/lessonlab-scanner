@@ -1,4 +1,3 @@
-
 // ==========================================
 // INTERNAL JS-ARUCO LIBRARY (CV + AR)
 // ==========================================
@@ -145,87 +144,130 @@ AR.Detector.prototype.mat2id = function (bits) { var id = 0, i; for (i = 0; i < 
 AR.Detector.prototype.rotate = function (src) { var dst = [], len = src.length, i, j; for (i = 0; i < len; ++i) { dst[i] = []; for (j = 0; j < src[i].length; ++j) { dst[i][j] = src[src[i].length - j - 1][i]; } } return dst; };
 AR.Detector.prototype.rotate2 = function (src, rotation) { var dst = [], len = src.length, i; for (i = 0; i < len; ++i) { dst[i] = src[(rotation + i) % len]; } return dst; };
 
-// ==========================================
-// SCANNER APP - TO'LIQ MANTIQ
-// ==========================================
 
-let debugDiv = null;
-let currentStream = null;
-let availableCameras = [];
-
-function log(msg, isError = false) {
-    console.log(msg);
-    if (!debugDiv) debugDiv = document.getElementById("debugConsole");
-    if (debugDiv) {
-        const color = isError ? "red" : "lime";
-        debugDiv.innerHTML += `<div style="color:${color};">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-        debugDiv.scrollTop = debugDiv.scrollHeight;
-    }
-}
+// ==========================================
+// SCANNER APP — SMART TESTER BOT
+// ==========================================
 
 document.addEventListener('DOMContentLoaded', async function () {
-    log("Scanner starting...");
 
+    // === TELEGRAM WEBAPP ===
     const tg = window.Telegram.WebApp;
     tg.expand();
     tg.ready();
 
-    // DOM Elements
-    const video = document.getElementById('videoInput');
-    const canvas = document.getElementById('canvasOutput');
-    const loadingMsg = document.getElementById('loadingMessage');
-    const resultsList = document.getElementById('results-list');
-    const correctCountEl = document.getElementById('correct-count');
-    const wrongCountEl = document.getElementById('wrong-count');
-    const totalScannedEl = document.getElementById('total-scanned');
-    const currentQEl = document.getElementById('current-q');
-    const cameraSelect = document.getElementById('cameraSelect');
-    const switchCameraBtn = document.getElementById('switchCameraBtn');
-    const answerBtns = document.querySelectorAll('.ans-btn');
-    const context = canvas.getContext('2d');
-
-    // STATE
-    let detector = new AR.Detector();
-    let correctAnswer = "A"; // Default to'g'ri javob
-    let currentQuestion = 1;
-    let scannedResults = {}; // {studentId: {answer, isCorrect}}
-    let frameBuffers = {}; // {studentId: [ans1, ans2, ...]}
+    // === TEST DATA ===
+    let testData = null;
+    let currentQuestion = 0;
+    let allResults = {};       // {questionIdx: {studentId: {answer, isCorrect, name}}}
+    let currentScanResults = {};
+    let frameBuffers = {};
     let isProcessing = false;
+    let currentStream = null;
+    let availableCameras = [];
+    const BUFFER_SIZE = 5;
+    const ANSWER_LETTERS = ["A", "B", "C", "D"];
 
-    const BUFFER_SIZE = 5; // Nechta kadr ketma-ket bir xil bo'lishi kerak
+    // === DOM ===
+    const sessionScreen = document.getElementById('sessionScreen');
+    const scannerScreen = document.getElementById('scannerScreen');
+    const leaderboardScreen = document.getElementById('leaderboardScreen');
 
-    // === TO'G'RI JAVOBNI TANLASH ===
-    answerBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            answerBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            correctAnswer = btn.dataset.ans;
-            log(`To'g'ri javob: ${correctAnswer}`);
+    // === LOAD TEST DATA FROM URL ===
+    function loadTestData() {
+        const params = new URLSearchParams(window.location.search);
+        const encoded = params.get('data');
+        if (encoded) {
+            try {
+                testData = JSON.parse(atob(encoded));
+            } catch (e) {
+                testData = null;
+            }
+        }
 
-            // Mavjud natijalarni qayta baholash
-            recalculateResults();
-        });
+        if (!testData) {
+            // Demo mode
+            testData = {
+                test_id: 0,
+                title: "Demo Test",
+                class_name: "Namuna sinf",
+                students: [
+                    { id: 1, name: "Ali Valiyev" },
+                    { id: 2, name: "Vali Aliyev" },
+                    { id: 3, name: "Sardor Karimov" }
+                ],
+                questions: [
+                    { text: "Father tarjimasi?", options: ["Ota", "Ona", "Aka", "Uka"], correct: 0 },
+                    { text: "Mother tarjimasi?", options: ["Ota", "Ona", "Aka", "Opacha"], correct: 1 }
+                ]
+            };
+        }
+
+        // Fill session screen
+        document.getElementById('sessionTitle').textContent = testData.title;
+        document.getElementById('sessionClass').textContent = testData.class_name || '—';
+        document.getElementById('sessionCount').textContent = testData.questions.length + ' ta';
+        document.getElementById('sessionStudents').textContent = testData.students.length + ' ta';
+    }
+
+    // === GET STUDENT NAME BY MARKER ID ===
+    function getStudentName(markerId) {
+        const studentIdx = markerId; // ArUco marker 0 = student 1, etc.
+        const student = testData.students.find(s => s.id === studentIdx + 1);
+        return student ? student.name : `#${studentIdx + 1}`;
+    }
+
+    // === START SCANNER ===
+    document.getElementById('startScannerBtn').addEventListener('click', () => {
+        sessionScreen.classList.add('scanner-hidden');
+        scannerScreen.classList.remove('scanner-hidden');
+        document.getElementById('scannerTitle').textContent = testData.title;
+        document.getElementById('total-q').textContent = testData.questions.length;
+        showQuestion(0);
+        initCamera();
     });
 
-    // Boshlang'ich A ni tanlash
-    document.querySelector('.ans-btn[data-ans="A"]').classList.add('active');
+    // === SHOW QUESTION ===
+    function showQuestion(idx) {
+        if (idx < 0 || idx >= testData.questions.length) return;
+        currentQuestion = idx;
 
-    // === NATIJALARNI QAYTA HISOBLASH ===
-    function recalculateResults() {
-        Object.keys(scannedResults).forEach(id => {
-            const ans = scannedResults[id].answer;
-            scannedResults[id].isCorrect = (ans === correctAnswer);
-        });
+        // Save previous results
+        if (Object.keys(currentScanResults).length > 0) {
+            allResults[currentQuestion] = { ...currentScanResults };
+        }
+
+        // Load existing results for this question
+        currentScanResults = allResults[idx] || {};
+        frameBuffers = {};
+
+        const q = testData.questions[idx];
+        document.getElementById('current-q').textContent = idx + 1;
+        document.getElementById('questionText').textContent = q.text;
+        document.getElementById('correctLetter').textContent = ANSWER_LETTERS[q.correct];
+
+        // Update navigation
+        document.getElementById('prev-question-btn').disabled = idx === 0;
+        const isLast = idx === testData.questions.length - 1;
+        document.getElementById('next-question-btn').textContent = isLast ? 'Oxirgi ➡️' : 'Keyingi ➡️';
+
         updateUI();
     }
 
-    // === KAMERA FUNKSIYALARI ===
-    async function getAvailableCameras() {
+    // === CAMERA ===
+    async function initCamera() {
+        const video = document.getElementById('videoInput');
+        const canvas = document.getElementById('canvasOutput');
+        const loadingMsg = document.getElementById('loadingMessage');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const context = canvas.getContext('2d');
+        const detector = new AR.Detector();
+
+        // Get cameras
         try {
             await navigator.mediaDevices.getUserMedia({ video: true });
             const devices = await navigator.mediaDevices.enumerateDevices();
             availableCameras = devices.filter(d => d.kind === 'videoinput');
-            log(`Kameralar: ${availableCameras.length} ta`);
 
             cameraSelect.innerHTML = '';
             availableCameras.forEach((cam, i) => {
@@ -235,199 +277,239 @@ document.addEventListener('DOMContentLoaded', async function () {
                 cameraSelect.appendChild(opt);
             });
 
-            // Orqa kamerani topish
+            // Prefer back camera
             const back = availableCameras.find(c =>
                 c.label.toLowerCase().includes('back') ||
                 c.label.toLowerCase().includes('environment') ||
                 c.label.toLowerCase().includes('rear')
             );
             if (back) cameraSelect.value = back.deviceId;
-
         } catch (e) {
-            log("Kamera xatosi: " + e.message, true);
-        }
-    }
-
-    async function startCamera(deviceId = null) {
-        if (currentStream) {
-            currentStream.getTracks().forEach(t => t.stop());
+            loadingMsg.textContent = "Kamera ruxsati berilmadi!";
+            return;
         }
 
-        const constraints = {
-            audio: false,
-            video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
-        };
-
-        try {
-            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-            video.srcObject = currentStream;
-            await video.play();
-            log("Kamera faol!");
-            loadingMsg.style.display = 'none';
-        } catch (e) {
-            log("Kamera: " + e.message, true);
-            // Fallback
+        async function startCamera(deviceId) {
+            if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+            const constraints = {
+                audio: false,
+                video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }
+            };
             try {
-                currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = currentStream;
                 await video.play();
-                log("Fallback kamera");
                 loadingMsg.style.display = 'none';
-            } catch (e2) {
-                loadingMsg.textContent = "Kamera ochilmadi!";
+            } catch (e) {
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = currentStream;
+                    await video.play();
+                    loadingMsg.style.display = 'none';
+                } catch (e2) {
+                    loadingMsg.textContent = "Kamera ochilmadi!";
+                }
             }
         }
+
+        cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
+        document.getElementById('switchCameraBtn').addEventListener('click', () => {
+            const idx = availableCameras.findIndex(c => c.deviceId === cameraSelect.value);
+            const next = (idx + 1) % availableCameras.length;
+            cameraSelect.value = availableCameras[next]?.deviceId || '';
+            startCamera(cameraSelect.value);
+        });
+
+        // Video ready
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            if (!isProcessing) {
+                isProcessing = true;
+                requestAnimationFrame(tick);
+            }
+        };
+
+        // === MAIN DETECTION LOOP ===
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                try {
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const markers = detector.detect(imageData);
+                    const q = testData.questions[currentQuestion];
+                    const correctIdx = q.correct;
+
+                    markers.forEach(m => {
+                        const c = m.corners;
+                        const studentId = m.id + 1;
+
+                        // Detect answer from orientation
+                        let minY = Infinity, topIdx = -1;
+                        c.forEach((p, i) => { if (p.y < minY) { minY = p.y; topIdx = i; } });
+                        const currentAns = ANSWER_LETTERS[topIdx] || "?";
+                        const answerIdx = topIdx;
+
+                        // Lock-in buffer
+                        if (!frameBuffers[studentId]) frameBuffers[studentId] = [];
+                        frameBuffers[studentId].push(currentAns);
+                        if (frameBuffers[studentId].length > BUFFER_SIZE) frameBuffers[studentId].shift();
+
+                        const isStable = frameBuffers[studentId].length >= BUFFER_SIZE &&
+                            frameBuffers[studentId].every(a => a === currentAns);
+
+                        if (isStable) {
+                            const isCorrect = (answerIdx === correctIdx);
+                            drawMarkerBox(c, isCorrect, studentId, currentAns);
+
+                            if (!currentScanResults[studentId] || currentScanResults[studentId].answer !== currentAns) {
+                                currentScanResults[studentId] = {
+                                    answer: currentAns,
+                                    isCorrect: isCorrect,
+                                    name: getStudentName(m.id)
+                                };
+                                if (tg.HapticFeedback) {
+                                    tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
+                                }
+                                updateUI();
+                            }
+                        } else {
+                            drawMarkerBox(c, null, studentId, currentAns);
+                        }
+                    });
+                } catch (e) { /* silent */ }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        function drawMarkerBox(corners, isCorrect, id, ans) {
+            const name = getStudentName(id - 1);
+            let color = "#888888";
+            let label = `${name}: ?`;
+
+            if (isCorrect === true) { color = "#00ff00"; label = `${name}: ${ans} ✓`; }
+            else if (isCorrect === false) { color = "#ff4444"; label = `${name}: ${ans} ✗`; }
+            else { label = `${name}: ${ans} ...`; }
+
+            context.strokeStyle = color;
+            context.lineWidth = 4;
+            context.beginPath();
+            context.moveTo(corners[0].x, corners[0].y);
+            corners.forEach(p => context.lineTo(p.x, p.y));
+            context.closePath();
+            context.stroke();
+
+            context.fillStyle = isCorrect === null ? "rgba(128,128,128,0.2)" :
+                (isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)");
+            context.fill();
+
+            context.fillStyle = color;
+            context.font = "bold 18px Arial";
+            const textWidth = context.measureText(label).width;
+            context.fillRect(corners[0].x, corners[0].y - 30, textWidth + 10, 26);
+            context.fillStyle = "#000";
+            context.fillText(label, corners[0].x + 5, corners[0].y - 10);
+        }
+
+        await startCamera(cameraSelect.value || null);
     }
 
-    cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
-    switchCameraBtn.addEventListener('click', () => {
-        const idx = availableCameras.findIndex(c => c.deviceId === cameraSelect.value);
-        const next = (idx + 1) % availableCameras.length;
-        cameraSelect.value = availableCameras[next]?.deviceId || '';
-        startCamera(cameraSelect.value);
+    // === UI UPDATE ===
+    function updateUI() {
+        const results = Object.entries(currentScanResults);
+        const correct = results.filter(([, r]) => r.isCorrect).length;
+        const wrong = results.filter(([, r]) => !r.isCorrect).length;
+
+        document.getElementById('correct-count').textContent = correct;
+        document.getElementById('wrong-count').textContent = wrong;
+        document.getElementById('total-scanned').textContent = results.length;
+
+        const list = document.getElementById('results-list');
+        list.innerHTML = "";
+        results.forEach(([id, r]) => {
+            const li = document.createElement("li");
+            li.className = `result-item ${r.isCorrect ? 'correct' : 'wrong'}`;
+            li.innerHTML = `<span>${r.name}</span> <strong>${r.answer}</strong> ${r.isCorrect ? '✅' : '❌'}`;
+            list.appendChild(li);
+        });
+    }
+
+    // === NAVIGATION ===
+    document.getElementById('next-question-btn').addEventListener('click', () => {
+        // Save current question results
+        allResults[currentQuestion] = { ...currentScanResults };
+
+        if (currentQuestion >= testData.questions.length - 1) {
+            showLeaderboard();
+        } else {
+            showQuestion(currentQuestion + 1);
+        }
     });
 
-    // === BUTTONS ===
-    document.getElementById('next-question-btn').addEventListener('click', () => {
-        currentQuestion++;
-        currentQEl.textContent = currentQuestion;
-        scannedResults = {};
-        updateUI();
-        log(`Savol ${currentQuestion}`);
+    document.getElementById('prev-question-btn').addEventListener('click', () => {
+        allResults[currentQuestion] = { ...currentScanResults };
+        if (currentQuestion > 0) showQuestion(currentQuestion - 1);
     });
 
     document.getElementById('finish-test-btn').addEventListener('click', () => {
+        allResults[currentQuestion] = { ...currentScanResults };
+        showLeaderboard();
+    });
+
+    // === LEADERBOARD ===
+    function showLeaderboard() {
+        allResults[currentQuestion] = { ...currentScanResults };
+
+        // Stop camera
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+
+        scannerScreen.classList.add('scanner-hidden');
+        leaderboardScreen.classList.remove('scanner-hidden');
+
+        // Calculate scores
+        const scores = {};
+        Object.entries(allResults).forEach(([qIdx, results]) => {
+            Object.entries(results).forEach(([studentId, r]) => {
+                if (!scores[studentId]) scores[studentId] = { name: r.name, correct: 0, total: 0 };
+                scores[studentId].total++;
+                if (r.isCorrect) scores[studentId].correct++;
+            });
+        });
+
+        // Sort by correct answers
+        const sorted = Object.entries(scores)
+            .sort(([, a], [, b]) => b.correct - a.correct);
+
+        const list = document.getElementById('lbList');
+        list.innerHTML = '';
+        const medals = ['🥇', '🥈', '🥉'];
+
+        sorted.forEach(([id, s], i) => {
+            const row = document.createElement('div');
+            row.className = 'lb-row';
+            const pct = s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0;
+            row.innerHTML = `
+                <div class="lb-rank">${i < 3 ? medals[i] : (i + 1)}</div>
+                <div class="lb-name">${s.name}</div>
+                <div class="lb-score">${s.correct}/${testData.questions.length} (${pct}%)</div>
+            `;
+            list.appendChild(row);
+        });
+    }
+
+    // === SEND RESULTS TO BOT ===
+    document.getElementById('sendResultsBtn').addEventListener('click', () => {
         const data = {
-            action: "finish_test",
-            question: currentQuestion,
-            results: scannedResults
+            action: "llab_qr_results",
+            test_id: testData.test_id,
+            title: testData.title,
+            total_questions: testData.questions.length,
+            results: allResults
         };
         tg.sendData(JSON.stringify(data));
         tg.close();
     });
 
-    // === VIDEO READY ===
-    video.onloadedmetadata = () => {
-        log(`Video: ${video.videoWidth}x${video.videoHeight}`);
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        if (!isProcessing) {
-            isProcessing = true;
-            log("Detection started");
-            requestAnimationFrame(tick);
-        }
-    };
-
-    // === MAIN DETECTION LOOP ===
-    function tick() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            try {
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const markers = detector.detect(imageData);
-
-                markers.forEach(m => {
-                    const c = m.corners;
-                    const studentId = m.id + 1;
-
-                    // Javobni aniqlash
-                    let minY = Infinity, idx = -1;
-                    c.forEach((p, i) => { if (p.y < minY) { minY = p.y; idx = i; } });
-                    const currentAns = ["A", "B", "C", "D"][idx] || "?";
-
-                    // --- LOCK-IN LOGIC (FLICKERING OLDINI OLISH) ---
-                    if (!frameBuffers[studentId]) frameBuffers[studentId] = [];
-                    frameBuffers[studentId].push(currentAns);
-                    if (frameBuffers[studentId].length > BUFFER_SIZE) frameBuffers[studentId].shift();
-
-                    // Agar oxirgi N ta kadrda bir xil natija bo'lsa, javobni qabul qilamiz
-                    const isStable = frameBuffers[studentId].length >= BUFFER_SIZE && frameBuffers[studentId].every(a => a === currentAns);
-
-                    if (isStable) {
-                        const isCorrect = (currentAns === correctAnswer);
-                        drawMarkerBox(c, isCorrect, studentId, currentAns);
-
-                        // Natijani saqlash
-                        if (!scannedResults[studentId] || scannedResults[studentId].answer !== currentAns) {
-                            scannedResults[studentId] = { answer: currentAns, isCorrect: isCorrect };
-                            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(isCorrect ? 'success' : 'error');
-                            updateUI();
-                        }
-                    } else {
-                        // Stabil emas, kulrang ramka chizamiz
-                        drawMarkerBox(c, null, studentId, currentAns);
-                    }
-                });
-            } catch (e) {
-                // Silent
-            }
-        }
-        requestAnimationFrame(tick);
-    }
-
-    function drawMarkerBox(corners, isCorrect, id, ans) {
-        let color = "#888888"; // Barqaror emas
-        let label = `P${id}: ?`;
-
-        if (isCorrect === true) {
-            color = "#00ff00";
-            label = `P${id}: ${ans} ✓`;
-        } else if (isCorrect === false) {
-            color = "#ff4444";
-            label = `P${id}: ${ans} ✗`;
-        } else {
-            label = `P${id}: ${ans} ...`;
-        }
-
-        context.strokeStyle = color;
-        context.lineWidth = 4;
-
-        context.beginPath();
-        context.moveTo(corners[0].x, corners[0].y);
-        corners.forEach(p => context.lineTo(p.x, p.y));
-        context.closePath();
-        context.stroke();
-
-        // Markerni ichini bo'yash (semi-transparent)
-        context.fillStyle = isCorrect === null ? "rgba(128,128,128,0.2)" :
-            (isCorrect ? "rgba(0,255,0,0.15)" : "rgba(255,0,0,0.15)");
-        context.fill();
-
-        // Label fon
-        context.fillStyle = color;
-        const textWidth = context.measureText(label).width;
-        context.fillRect(corners[0].x, corners[0].y - 35, textWidth + 10, 30);
-
-        // Label matn
-        context.fillStyle = "#000";
-        context.font = "bold 20px Arial";
-        context.fillText(label, corners[0].x + 5, corners[0].y - 12);
-    }
-
-    // === UI YANGILASH ===
-    function updateUI() {
-        const results = Object.entries(scannedResults);
-        const correct = results.filter(([, r]) => r.isCorrect).length;
-        const wrong = results.filter(([, r]) => !r.isCorrect).length;
-
-        correctCountEl.textContent = correct;
-        wrongCountEl.textContent = wrong;
-        totalScannedEl.textContent = results.length;
-
-        resultsList.innerHTML = "";
-        results.forEach(([id, r]) => {
-            const li = document.createElement("li");
-            li.className = `result-item ${r.isCorrect ? 'correct' : 'wrong'}`;
-            li.innerHTML = `<span>P${id}</span> <strong>${r.answer}</strong> ${r.isCorrect ? '✅' : '❌'}`;
-            resultsList.appendChild(li);
-        });
-    }
-
-    // === START ===
-    await getAvailableCameras();
-    if (availableCameras.length > 0) {
-        await startCamera(cameraSelect.value || null);
-    }
+    // === INIT ===
+    loadTestData();
 });

@@ -11,54 +11,93 @@
 
 <body>
 
-    <!-- Yuqori qism -->
-    <div class="top-bar">
-        <div class="header">
-            <h3>📷 LLabQR Scanner</h3>
-            <span id="qcount">Savol: <span id="current-q">1</span>/10</span>
+    <!-- === SESSION START SCREEN === -->
+    <div id="sessionScreen" class="session-screen">
+        <div class="session-header">
+            <div class="session-icon">📷</div>
+            <h2>LLabQR Scanner</h2>
         </div>
-        <div class="stats">
-            <div class="stat-box correct">✅ <span id="correct-count">0</span></div>
-            <div class="stat-box wrong">❌ <span id="wrong-count">0</span></div>
-            <div class="stat-box total">👥 <span id="total-scanned">0</span></div>
+        <div class="session-info">
+            <div class="session-card">
+                <span class="label">📝 Test:</span>
+                <span class="value" id="sessionTitle">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">🏫 Sinf:</span>
+                <span class="value" id="sessionClass">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">❓ Savollar:</span>
+                <span class="value" id="sessionCount">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">👥 O'quvchilar:</span>
+                <span class="value" id="sessionStudents">—</span>
+            </div>
+        </div>
+        <button id="startScannerBtn" class="btn big-start">▶ Skanerni boshlash</button>
+        <p class="session-hint">Kamerani ArUco markerlarga qarating</p>
+    </div>
+
+    <!-- === SCANNER SCREEN === -->
+    <div id="scannerScreen" class="scanner-hidden">
+        <!-- Top bar -->
+        <div class="top-bar">
+            <div class="header">
+                <h3>📷 <span id="scannerTitle">LLabQR</span></h3>
+                <span id="qcount">Savol: <span id="current-q">1</span>/<span id="total-q">10</span></span>
+            </div>
+            <div class="stats">
+                <div class="stat-box correct">✅ <span id="correct-count">0</span></div>
+                <div class="stat-box wrong">❌ <span id="wrong-count">0</span></div>
+                <div class="stat-box total">👥 <span id="total-scanned">0</span></div>
+            </div>
+        </div>
+
+        <!-- Question + correct answer display -->
+        <div class="question-bar">
+            <div class="q-text" id="questionText">Savol matni...</div>
+            <div class="correct-ans" id="correctAnsDisplay">To'g'ri: <strong id="correctLetter">A</strong></div>
+        </div>
+
+        <!-- Camera settings -->
+        <div class="camera-settings">
+            <select id="cameraSelect">
+                <option value="">Kamerani tanlang...</option>
+            </select>
+            <button id="switchCameraBtn" class="btn small">🔄</button>
+        </div>
+
+        <!-- Camera -->
+        <div class="camera-container">
+            <div id="debugConsole"></div>
+            <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
+            <canvas id="canvasOutput"></canvas>
+            <div id="loadingMessage">Kamera yuklanmoqda...</div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-container">
+            <h4>Natijalar:</h4>
+            <ul id="results-list"></ul>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="prev-question-btn" class="btn secondary">⬅️</button>
+            <button id="next-question-btn" class="btn primary">Keyingi ➡️</button>
+            <button id="finish-test-btn" class="btn danger">🏁 Tugatish</button>
         </div>
     </div>
 
-    <!-- TO'G'RI JAVOBNI TANLASH -->
-    <div class="answer-selector">
-        <span>To'g'ri javob:</span>
-        <button class="ans-btn" data-ans="A">A</button>
-        <button class="ans-btn" data-ans="B">B</button>
-        <button class="ans-btn" data-ans="C">C</button>
-        <button class="ans-btn" data-ans="D">D</button>
-    </div>
-
-    <!-- Kamera sozlamalari -->
-    <div class="camera-settings">
-        <select id="cameraSelect">
-            <option value="">Kamerani tanlang...</option>
-        </select>
-        <button id="switchCameraBtn" class="btn small">🔄</button>
-    </div>
-
-    <!-- Kamera -->
-    <div class="camera-container">
-        <div id="debugConsole"></div>
-        <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
-        <canvas id="canvasOutput"></canvas>
-        <div id="loadingMessage">Kamera yuklanmoqda...</div>
-    </div>
-
-    <!-- Natijalar -->
-    <div class="results-container">
-        <h4>Natijalar:</h4>
-        <ul id="results-list"></ul>
-    </div>
-
-    <!-- Tugmalar -->
-    <div class="controls">
-        <button id="next-question-btn" class="btn primary">Keyingi ➡️</button>
-        <button id="finish-test-btn" class="btn danger">Tugatish 🏁</button>
+    <!-- === LEADERBOARD SCREEN === -->
+    <div id="leaderboardScreen" class="scanner-hidden leaderboard-screen">
+        <div class="lb-header">
+            <div class="lb-trophy">🏆</div>
+            <h2>Yakuniy natijalar</h2>
+        </div>
+        <div class="lb-list" id="lbList"></div>
+        <button id="sendResultsBtn" class="btn big-start">📤 Natijalarni botga yuborish</button>
     </div>
 
     <script src="app.js"></script>
