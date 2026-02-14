@@ -70,7 +70,6 @@
 
         <!-- Camera -->
         <div class="camera-container">
-            <div id="debugConsole"></div>
             <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
             <canvas id="canvasOutput"></canvas>
             <div id="loadingMessage">Kamera yuklanmoqda...</div>
@@ -100,6 +99,10 @@
         <button id="sendResultsBtn" class="btn big-start">📤 Natijalarni botga yuborish</button>
     </div>
 
+    <!-- ORIGINAL CV + ArUco libraries (proven to work) -->
+    <script src="cv.js"></script>
+    <script src="aruco.js"></script>
+    <!-- App logic -->
     <script src="app.js"></script>
 </body>
 

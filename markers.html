@@ -76,7 +76,6 @@
                               padding: 8px;
                               text-align: center;
                               page-break-inside: avoid;
-                              position: relative;
                     }
 
                     .card .student-id {
@@ -86,23 +85,18 @@
                               color: #1e293b;
                     }
 
-                    .card canvas {
-                              display: block;
-                              margin: 0 auto;
-                    }
-
                     /* A/B/C/D labels around the marker */
-                    .card .abcd-container {
+                    .abcd-container {
                               position: relative;
-                              width: 120px;
-                              height: 120px;
+                              width: 130px;
+                              height: 130px;
                               margin: 0 auto;
                     }
 
-                    .card .abcd-container canvas {
+                    .abcd-container canvas {
                               position: absolute;
-                              top: 10px;
-                              left: 10px;
+                              top: 15px;
+                              left: 15px;
                     }
 
                     .abcd-label {
@@ -112,13 +106,13 @@
                               display: flex;
                               align-items: center;
                               justify-content: center;
-                              width: 22px;
-                              height: 22px;
+                              width: 24px;
+                              height: 24px;
                               border-radius: 4px;
                     }
 
                     .abcd-top {
-                              top: -4px;
+                              top: -6px;
                               left: 50%;
                               transform: translateX(-50%);
                               background: #ef4444;
@@ -126,7 +120,7 @@
                     }
 
                     .abcd-right {
-                              right: -4px;
+                              right: -6px;
                               top: 50%;
                               transform: translateY(-50%);
                               background: #3b82f6;
@@ -134,7 +128,7 @@
                     }
 
                     .abcd-bottom {
-                              bottom: -4px;
+                              bottom: -6px;
                               left: 50%;
                               transform: translateX(-50%);
                               background: #f59e0b;
@@ -142,7 +136,7 @@
                     }
 
                     .abcd-left {
-                              left: -4px;
+                              left: -6px;
                               top: 50%;
                               transform: translateY(-50%);
                               background: #22c55e;
@@ -153,14 +147,6 @@
                               font-size: 9px;
                               color: #999;
                               margin-top: 6px;
-                              line-height: 1.3;
-                    }
-
-                    /* Scissors line between cards for cutting */
-                    .cut-line {
-                              grid-column: 1 / -1;
-                              border-top: 1px dashed #ccc;
-                              margin: 4px 0;
                     }
 
                     @media print {
@@ -191,54 +177,60 @@
           <p class="info">
                     Har bir o'quvchiga bitta karta tarqating. Javob berish uchun kartani to'g'ri tomonga
                     aylantiring.<br>
-                    <strong>A</strong> = yuqorida, <strong>B</strong> = o'ngda, <strong>C</strong> = pastda,
-                    <strong>D</strong> = chapda
+                    <strong style="color:#ef4444">A</strong> = yuqorida &nbsp;
+                    <strong style="color:#3b82f6">B</strong> = o'ngda &nbsp;
+                    <strong style="color:#f59e0b">C</strong> = pastda &nbsp;
+                    <strong style="color:#22c55e">D</strong> = chapda
           </p>
 
           <div class="controls">
                     <label>O'quvchilar soni: </label>
-                    <input type="number" id="countInput" value="30" min="1" max="40">
-                    <button onclick="generateCards()">🔄 Kartalarni yaratish</button>
-                    <button onclick="window.print()">🖨️ Chop etish (Print)</button>
+                    <input type="number" id="countInput" value="30" min="1" max="100">
+                    <button onclick="generateCards()">🔄 Yaratish</button>
+                    <button onclick="window.print()">🖨️ Chop etish</button>
           </div>
 
           <div id="cardsContainer" class="cards-grid"></div>
 
           <script>
-                    // ArUco 5x5 patterns (same as in app.js detector)
-                    const patterns = {
-                              0: [[1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [1, 0, 0, 0, 0]],
-                              1: [[1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [1, 0, 1, 1, 1]],
-                              2: [[0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1]],
-                              3: [[0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [0, 1, 1, 1, 0]],
-                              4: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 0, 0, 0]],
-                              5: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 1, 1, 1]],
-                              6: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1]],
-                              7: [[0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 1, 1, 0]],
-                              8: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0]],
-                              9: [[1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1]],
-                              10: [[0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1]],
-                              11: [[0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0]],
-                              12: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0]],
-                              13: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1]],
-                              14: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1]],
-                              15: [[0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0]],
-                              16: [[1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0]],
-                              17: [[1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1]],
-                              18: [[0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1]],
-                              19: [[0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0]],
-                              20: [[1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 0, 0, 0, 0]],
-                              21: [[1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1], [1, 0, 1, 1, 1]],
-                              22: [[0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1], [0, 1, 0, 0, 1]],
-                              23: [[0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0], [0, 1, 1, 1, 0]],
-                              24: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0]],
-                              25: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1]],
-                              26: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [0, 1, 0, 0, 1]],
-                              27: [[0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [0, 1, 1, 1, 0]],
-                              28: [[1, 0, 0, 0, 0], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0], [1, 0, 1, 1, 1], [1, 0, 0, 0, 0]],
-                              29: [[1, 0, 1, 1, 1], [0, 1, 1, 1, 0], [0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 1, 1, 1]]
-                    };
+                    // =============================================
+                    // CORRECT ArUco MARKER PATTERN GENERATION
+                    // These patterns match the js-aruco detector's
+                    // hammingDistance() and mat2id() algorithms.
+                    // =============================================
 
+                    // The 4 valid ArUco row patterns
+                    const VALID_ROWS = [
+                              [1, 0, 0, 0, 0],   // col1=0, col3=0 → digit 0
+                              [1, 0, 1, 1, 1],   // col1=0, col3=1 → digit 1
+                              [0, 1, 0, 0, 1],   // col1=1, col3=0 → digit 2
+                              [0, 1, 1, 1, 0]    // col1=1, col3=1 → digit 3
+                    ];
+
+                    /**
+                     * Generate the correct 5x5 bit pattern for a given ArUco ID.
+                     *
+                     * The mat2id function computes:
+                     *   for each row i: id = (id << 1) | bits[i][1]; id = (id << 1) | bits[i][3];
+                     *
+                     * So the ID is encoded as 5 base-4 digits, where each digit
+                     * determines which valid row pattern to use.
+                     */
+                    function generatePattern(id) {
+                              const pattern = [];
+                              for (let row = 0; row < 5; row++) {
+                                        // Extract 2-bit digit for this row (most significant row first)
+                                        const shift = (4 - row) * 2;
+                                        const digit = (id >> shift) & 3;
+                                        pattern.push([...VALID_ROWS[digit]]);
+                              }
+                              return pattern;
+                    }
+
+                    /**
+                     * Draw a 7x7 ArUco marker on a canvas.
+                     * The marker has a 1-cell black border and a 5x5 inner pattern.
+                     */
                     function drawMarker(id, size) {
                               const canvas = document.createElement('canvas');
                               canvas.width = size;
@@ -246,27 +238,38 @@
                               const ctx = canvas.getContext('2d');
                               const cell = size / 7;
 
-                              // Black border
+                              // Fill all black (border)
                               ctx.fillStyle = '#000';
                               ctx.fillRect(0, 0, size, size);
 
-                              // White inner
-                              ctx.fillStyle = '#fff';
-                              ctx.fillRect(cell, cell, cell * 5, cell * 5);
-
-                              // Pattern
-                              const p = patterns[id] || patterns[0];
+                              // Draw inner 5x5 pattern
+                              const pattern = generatePattern(id);
                               for (let i = 0; i < 5; i++) {
                                         for (let j = 0; j < 5; j++) {
-                                                  ctx.fillStyle = p[i][j] === 1 ? '#000' : '#fff';
+                                                  ctx.fillStyle = pattern[i][j] === 1 ? '#000' : '#fff';
                                                   ctx.fillRect((j + 1) * cell, (i + 1) * cell, cell, cell);
                                         }
                               }
                               return canvas;
                     }
 
+                    /**
+                     * Verify a pattern produces the expected ID (for debugging).
+                     */
+                    function verifyPattern(id) {
+                              const pattern = generatePattern(id);
+                              let computedId = 0;
+                              for (let i = 0; i < 5; i++) {
+                                        computedId <<= 1;
+                                        computedId |= pattern[i][1];
+                                        computedId <<= 1;
+                                        computedId |= pattern[i][3];
+                              }
+                              return computedId === id;
+                    }
+
                     function generateCards() {
-                              const count = Math.min(parseInt(document.getElementById('countInput').value) || 30, 40);
+                              const count = Math.min(parseInt(document.getElementById('countInput').value) || 30, 100);
                               const container = document.getElementById('cardsContainer');
                               container.innerHTML = '';
 
@@ -284,20 +287,15 @@
                                         const abcdDiv = document.createElement('div');
                                         abcdDiv.className = 'abcd-container';
 
+                                        // ArUco ID = i (0-based), Student number = i+1
                                         const marker = drawMarker(i, 100);
                                         abcdDiv.appendChild(marker);
 
-                                        // ABCD labels
-                                        const labels = [
-                                                  { cls: 'abcd-label abcd-top', text: 'A' },
-                                                  { cls: 'abcd-label abcd-right', text: 'B' },
-                                                  { cls: 'abcd-label abcd-bottom', text: 'C' },
-                                                  { cls: 'abcd-label abcd-left', text: 'D' }
-                                        ];
-                                        labels.forEach(l => {
+                                        // ABCD labels around the marker
+                                        ['abcd-top', 'abcd-right', 'abcd-bottom', 'abcd-left'].forEach((cls, idx) => {
                                                   const span = document.createElement('span');
-                                                  span.className = l.cls;
-                                                  span.textContent = l.text;
+                                                  span.className = `abcd-label ${cls}`;
+                                                  span.textContent = ['A', 'B', 'C', 'D'][idx];
                                                   abcdDiv.appendChild(span);
                                         });
 
@@ -310,14 +308,17 @@
                                         card.appendChild(hint);
 
                                         container.appendChild(card);
+                              }
 
-                                        // Cut line after every 5th row (every 25 cards)
-                                        if ((i + 1) % 25 === 0 && i < count - 1) {
-                                                  const cut = document.createElement('div');
-                                                  cut.className = 'cut-line';
-                                                  container.appendChild(cut);
+                              // Verify all patterns are correct
+                              let allValid = true;
+                              for (let i = 0; i < count; i++) {
+                                        if (!verifyPattern(i)) {
+                                                  console.error(`Pattern ${i} verification FAILED!`);
+                                                  allValid = false;
                                         }
                               }
+                              if (allValid) console.log(`✅ All ${count} patterns verified correctly!`);
                     }
 
                     // Generate on load
