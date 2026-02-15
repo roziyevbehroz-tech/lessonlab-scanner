@@ -1084,20 +1084,26 @@
             // ═══════════════════════════════════════
             $('startQuizBtn').onclick = function () {
                 startQuiz();
+                publishCommand('goto', 0);
             };
 
             $('prevBtn').onclick = function () {
-                if (currentQ > 0) showQuestion(currentQ - 1);
+                if (currentQ > 0) {
+                    showQuestion(currentQ - 1);
+                    publishCommand('goto', currentQ - 1);
+                }
             };
 
             $('nextBtn').onclick = function () {
                 if (currentQ < testData.questions.length - 1) {
                     showQuestion(currentQ + 1);
+                    publishCommand('goto', currentQ + 1);
                 }
             };
 
             $('finishBtn').onclick = function () {
                 showLeaderboard();
+                publishCommand('finish');
             };
 
             // ═══════════════════════════════════════

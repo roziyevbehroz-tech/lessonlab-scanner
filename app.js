@@ -161,13 +161,12 @@
             publishStatus('scanner-ready');
 
             // Allow manual access immediately if users just want to start
-            // But prefer waiting for ack
-            setTimeout(function () {
-                if (!synced) {
-                    hideOverlay(); // Fallback unlock
-                    updateSyncUI('connected'); // Fake it till you make it
-                }
-            }, 2000);
+            // Force sync to true so we can send commands immediately
+            synced = true;
+            hideOverlay();
+            updateSyncUI('connected');
+            $('prev-question-btn').disabled = false;
+            $('next-question-btn').disabled = false;
         });
 
         mqttClient.on('message', function (topic, message) {
@@ -205,7 +204,10 @@
     function syncSend(data) {
         if (mqttClient && mqttClient.connected && syncCode) {
             var msgStr = JSON.stringify(data);
+            dbg('TX: ' + data.type);
             mqttClient.publish('llab/sync/' + syncCode + '/data', msgStr, { qos: 0 });
+        } else {
+            dbg('TX Fail: No MQTT/Code');
         }
     }
 
@@ -236,37 +238,6 @@
     // Stub
     function connectToDisplay() { }
     function scheduleReconnect() { }
-
-    // ════════════════════════════════════════
-    // RECEIVE COMMANDS FROM WHITEBOARD
-    // ════════════════════════════════════════
-    function handleDisplayCommand(msg) {
-        dbg('CMD: ' + msg.type);
-
-        switch (msg.type) {
-            case 'goto':
-                // Whiteboard says: go to question X
-                showQuestion(msg.q);
-                break;
-
-            case 'finish':
-                // Whiteboard says: test is done
-                allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-                running = false;
-                if (cameraStream) cameraStream.getTracks().forEach(function (t) { t.stop(); });
-                showLeaderboard(msg.allResults || allResults);
-                break;
-
-            case 'sendResults':
-                // Whiteboard says: send results to Telegram bot
-                sendResults();
-                break;
-
-            case 'ping':
-                syncSend({ type: 'pong' });
-                break;
-        }
-    }
 
     // ════════════════════════════════════════
     // SYNC UI — disable navigation when synced
