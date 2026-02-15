@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLabQR — Quiz Display (Master)</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        /* ═══════════════════════════════════════
+   DISPLAY MASTER — Premium Dark UI
+   ═══════════════════════════════════════ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #0a0f1a;
+            --card: #111827;
+            --card2: #1e293b;
+            --primary: #3b82f6;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --border: #334155;
+            --gold: #fbbf24;
+            --silver: #94a3b8;
+            --bronze: #cd7f32;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', 'system-ui', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden
+        }
+
+        /* SCREENS */
+        .screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px
+        }
+
+        .hidden {
+            display: none !important
+        }
+
+        /* WELCOME */
+        .welcome-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center
+        }
+
+        .welcome-card h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent
+        }
+
+        .welcome-card .subtitle {
+            color: var(--muted);
+            font-size: 1.1rem;
+            margin-bottom: 30px
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 20px 0
+        }
+
+        .info-item {
+            background: var(--card2);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: left
+        }
+
+        .info-item .label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-bottom: 4px
+        }
+
+        .info-item .value {
+            font-size: 1.2rem;
+            font-weight: 600
+        }
+
+        /* SYNC STATUS */
+        .sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin: 20px 0
+        }
+
+        .sync-off {
+            background: rgba(100, 116, 139, 0.2);
+            color: #64748b
+        }
+
+        .sync-waiting {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            animation: pulse 2s infinite
+        }
+
+        .sync-ok {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.5
+            }
+        }
+
+        /* QUIZ SCREEN */
+        .quiz-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 0;
+            min-height: 100vh;
+            width: 100%
+        }
+
+        @media(max-width:900px) {
+            .quiz-layout {
+                grid-template-columns: 1fr
+            }
+        }
+
+        /* LEFT: QUESTION AREA */
+        .question-area {
+            display: flex;
+            flex-direction: column;
+            padding: 30px 40px
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px
+        }
+
+        .q-counter {
+            background: var(--primary);
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1rem
+        }
+
+        .test-title {
+            font-size: 1rem;
+            color: var(--muted)
+        }
+
+        .question-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            flex: 1;
+            display: flex;
+            flex-direction: column
+        }
+
+        .q-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            line-height: 1.4
+        }
+
+        .options-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 14px
+        }
+
+        .option-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            background: var(--card2);
+            border-radius: 12px;
+            border: 2px solid transparent;
+            transition: all 0.3s
+        }
+
+        .option-letter {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background: var(--border);
+            font-size: 1rem
+        }
+
+        .option-text {
+            font-size: 1.15rem;
+            flex: 1
+        }
+
+        .option-bar {
+            width: 100px;
+            height: 8px;
+            background: var(--card);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative
+        }
+
+        .option-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.4s;
+            min-width: 0
+        }
+
+        .option-count {
+            font-size: 0.85rem;
+            color: var(--muted);
+            width: 30px;
+            text-align: right
+        }
+
+        /* CONTROLS */
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            justify-content: center
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s
+        }
+
+        .btn:hover {
+            transform: scale(1.02)
+        }
+
+        .btn:active {
+            transform: scale(0.98)
+        }
+
+        .btn-prev {
+            background: var(--card2);
+            color: var(--text)
+        }
+
+        .btn-next {
+            background: var(--primary);
+            color: #fff
+        }
+
+        .btn-finish {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            font-size: 1.1rem;
+            padding: 16px 36px
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        /* RIGHT: LIVE RESULTS SIDEBAR */
+        .results-sidebar {
+            background: var(--card);
+            border-left: 1px solid var(--border);
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 100vh
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .sidebar-title .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block
+        }
+
+        .dot-live {
+            background: #22c55e;
+            box-shadow: 0 0 6px #22c55e;
+            animation: dotpulse 1.5s infinite
+        }
+
+        @keyframes dotpulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.3
+            }
+        }
+
+        .result-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            background: var(--card2);
+            transition: all 0.3s
+        }
+
+        .result-entry.scanning {
+            border-left: 3px solid var(--warn)
+        }
+
+        .result-entry.locked-correct {
+            border-left: 3px solid var(--success)
+        }
+
+        .result-entry.locked-wrong {
+            border-left: 3px solid var(--danger)
+        }
+
+        .re-name {
+            flex: 1;
+            font-weight: 500
+        }
+
+        .re-answer {
+            font-weight: 700;
+            font-size: 1.1rem
+        }
+
+        .re-status {
+            font-size: 1.2rem
+        }
+
+        .re-pct {
+            font-size: 0.8rem;
+            color: var(--warn)
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 10px;
+            margin: 16px 0;
+            padding: 12px;
+            background: var(--card2);
+            border-radius: 10px
+        }
+
+        .stat {
+            flex: 1;
+            text-align: center
+        }
+
+        .stat-num {
+            font-size: 1.6rem;
+            font-weight: 700
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted)
+        }
+
+        /* LEADERBOARD */
+        .lb-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 40px
+        }
+
+        .lb-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            text-align: center
+        }
+
+        .lb-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 5px
+        }
+
+        .lb-subtitle {
+            color: var(--muted);
+            margin-bottom: 24px
+        }
+
+        .lb-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            margin-bottom: 8px;
+            background: var(--card2);
+            border-radius: 12px;
+            text-align: left
+        }
+
+        .lb-rank {
+            font-size: 1.4rem;
+            width: 40px;
+            text-align: center;
+            font-weight: 700
+        }
+
+        .lb-name {
+            flex: 1;
+            font-size: 1.15rem;
+            font-weight: 600
+        }
+
+        .lb-score {
+            font-size: 1rem;
+            color: var(--primary);
+            font-weight: 600
+        }
+
+        .lb-pct {
+            font-size: 0.85rem;
+            color: var(--muted);
+            width: 50px;
+            text-align: right
+        }
+
+        .lb-row.gold {
+            background: linear-gradient(90deg, rgba(251, 191, 36, 0.15), transparent);
+            border-left: 3px solid var(--gold)
+        }
+
+        .lb-row.silver {
+            background: linear-gradient(90deg, rgba(148, 163, 184, 0.1), transparent);
+            border-left: 3px solid var(--silver)
+        }
+
+        .lb-row.bronze {
+            background: linear-gradient(90deg, rgba(205, 127, 50, 0.1), transparent);
+            border-left: 3px solid var(--bronze)
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ═══════════════ WELCOME SCREEN ═══════════════ -->
+    <div id="welcomeScreen" class="screen">
+        <div class="welcome-card">
+            <h1>📷 LLabQR</h1>
+            <p class="subtitle">Sinfxona Skaneri — Master Display</p>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="label">📝 Test</div>
+                    <div class="value" id="wTitle">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">❓ Savollar</div>
+                    <div class="value" id="wCount">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">🏫 Sinf</div>
+                    <div class="value" id="wClass">—</div>
+                </div>
+                <div class="info-item">
+                    <div class="label">👥 O'quvchilar</div>
+                    <div class="value" id="wStudents">—</div>
+                </div>
+            </div>
+            <div id="syncBadge" class="sync-badge sync-waiting">⏳ Telefon kutilmoqda...</div>
+            <p style="color:var(--muted);font-size:0.9rem;margin-top:10px">Telefondan skanerni oching — avtomatik
+                ulanadi</p>
+            <button id="startQuizBtn" class="btn btn-next" style="margin-top:20px;width:100%">▶️ Boshlash
+                (telefonsiz)</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════ QUIZ SCREEN ═══════════════ -->
+    <div id="quizScreen" class="hidden">
+        <div class="quiz-layout">
+            <!-- LEFT: Question -->
+            <div class="question-area">
+                <div class="top-bar">
+                    <span class="q-counter"><span id="qNum">1</span> / <span id="qTotal">10</span></span>
+                    <span class="test-title" id="qTestTitle">Test</span>
+                    <span id="quizSyncBadge" class="sync-badge sync-off" style="font-size:0.8rem;padding:6px 14px">⚪
+                        Telefon yo'q</span>
+                </div>
+                <div class="question-card">
+                    <div class="q-text" id="qText">Savol matni</div>
+                    <ul class="options-list" id="optionsList"></ul>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-prev" id="prevBtn" disabled>⬅️ Oldingi</button>
+                    <button class="btn btn-next" id="nextBtn">Keyingi ➡️</button>
+                    <button class="btn btn-finish" id="finishBtn">🏁 Tugatish</button>
+                </div>
+            </div>
+            <!-- RIGHT: Live Results -->
+            <div class="results-sidebar" id="resultsSidebar">
+                <div class="sidebar-title"><span class="dot dot-live" id="liveDot"></span> NATIJALAR</div>
+                <div class="stats-bar">
+                    <div class="stat">
+                        <div class="stat-num" id="sCorrect" style="color:var(--success)">0</div>
+                        <div class="stat-label">To'g'ri</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-num" id="sWrong" style="color:var(--danger)">0</div>
+                        <div class="stat-label">Xato</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-num" id="sTotal" style="color:var(--primary)">0</div>
+                        <div class="stat-label">Jami</div>
+                    </div>
+                </div>
+                <div id="liveResultsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════ LEADERBOARD ═══════════════ -->
+    <div id="leaderboardScreen" class="hidden">
+        <div class="lb-screen">
+            <div class="lb-card">
+                <div style="font-size:3rem;margin-bottom:10px">🏆</div>
+                <div class="lb-title">Natijalar</div>
+                <div class="lb-subtitle" id="lbSubtitle">Test yakunlandi</div>
+                <div id="lbList" style="margin:24px 0"></div>
+                <button class="btn btn-send" id="sendResultsBtn">📤 Natijani botga yuborish</button>
+                <p id="sendStatus" style="margin-top:12px;font-size:0.9rem;color:var(--muted)"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            // ═══════════════════════════════════════
+            // STATE
+            // ═══════════════════════════════════════
+            var testData = null;
+            var sessionId = null;
+            var currentQ = 0;
+            var liveResults = {};          // {mid: {name, answer, isCorrect, locked, pct}}
+            var allScanResults = {};       // {qIdx: {mid: {answer, isCorrect, name}}}
+            var syncPeer = null;
+            var scannerConn = null;
+            var scannerConnected = false;
+
+            function $(id) { return document.getElementById(id); }
+
+            // ═══════════════════════════════════════
+            // DATA LOADING
+            // ═══════════════════════════════════════
+            function loadTestData() {
+                try {
+                    var params = new URLSearchParams(window.location.search);
+                    var encoded = params.get('data');
+                    sessionId = params.get('session');
+                    if (encoded) testData = JSON.parse(atob(encoded));
+                } catch (e) { console.error('Parse err', e); }
+
+                if (!testData) {
+                    testData = {
+                        test_id: 0, title: 'Demo Test', class_name: 'Demo',
+                        students: [{ id: 0, name: 'Ali' }, { id: 1, name: 'Vali' }, { id: 2, name: 'Sardor' }],
+                        questions: [
+                            { text: 'Demo savol?', options: ['A', 'B', 'C', 'D'], correct: 1 }
+                        ]
+                    };
+                    if (!sessionId) sessionId = 'llab-demo-' + Date.now() % 100000;
+                }
+
+                $('wTitle').textContent = testData.title;
+                $('wCount').textContent = testData.questions.length + ' ta';
+                $('wClass').textContent = testData.class_name || '—';
+                $('wStudents').textContent = testData.students.length > 0 ? testData.students.length + ' ta' : '—';
+                document.title = 'LLabQR — ' + testData.title;
+            }
+
+            // ═══════════════════════════════════════
+            // PEERJS — MASTER (Display creates peer, waits)
+            // ═══════════════════════════════════════
+            function initSync() {
+                if (!sessionId) { console.log('No session'); return; }
+                if (typeof Peer === 'undefined') { console.log('No PeerJS'); return; }
+
+                var displayId = sessionId + '-display';
+                console.log('[DISPLAY] Creating peer: ' + displayId);
+
+                try {
+                    syncPeer = new Peer(displayId, {
+                        debug: 0,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' },
+                                { urls: 'stun:global.stun.twilio.com:3478' }
+                            ]
+                        }
+                    });
+                } catch (e) {
+                    console.error('Peer err', e);
+                    updateSyncBadge('off');
+                    return;
+                }
+
+                syncPeer.on('open', function (id) {
+                    console.log('[DISPLAY] Peer open: ' + id);
+                    updateSyncBadge('waiting');
+                });
+
+                syncPeer.on('connection', function (conn) {
+                    console.log('[DISPLAY] Scanner incoming!');
+                    scannerConn = conn;
+
+                    conn.on('open', function () {
+                        scannerConnected = true;
+                        console.log('[DISPLAY] Scanner CONNECTED!');
+                        updateSyncBadge('connected');
+                    });
+
+                    conn.on('data', function (msg) {
+                        handleScannerMessage(msg);
+                    });
+
+                    conn.on('close', function () {
+                        scannerConnected = false;
+                        console.log('[DISPLAY] Scanner disconnected');
+                        updateSyncBadge('waiting');
+                    });
+
+                    conn.on('error', function (err) {
+                        console.error('[DISPLAY] Conn err:', err);
+                    });
+                });
+
+                syncPeer.on('error', function (err) {
+                    console.error('[DISPLAY] Peer err:', err.type, err);
+                    if (err.type === 'unavailable-id') {
+                        // ID taken — destroy and retry
+                        syncPeer.destroy();
+                        setTimeout(initSync, 2000);
+                    }
+                });
+
+                syncPeer.on('disconnected', function () {
+                    updateSyncBadge('waiting');
+                    try { syncPeer.reconnect(); } catch (e) { }
+                });
+
+                // Keepalive ping every 15s
+                setInterval(function () {
+                    if (scannerConn && scannerConn.open) {
+                        try { scannerConn.send({ type: 'ping' }); } catch (e) { }
+                    }
+                }, 15000);
+            }
+
+            function syncSend(data) {
+                if (scannerConn && scannerConn.open) {
+                    try { scannerConn.send(data); } catch (e) { }
+                }
+            }
+
+            function updateSyncBadge(status) {
+                var badge = $('syncBadge');
+                var quizBadge = $('quizSyncBadge');
+
+                switch (status) {
+                    case 'connected':
+                        if (badge) { badge.className = 'sync-badge sync-ok'; badge.innerHTML = '🟢 Telefon ulangan!'; }
+                        if (quizBadge) { quizBadge.className = 'sync-badge sync-ok'; quizBadge.innerHTML = '🟢 Ulangan'; }
+                        var dot = $('liveDot');
+                        if (dot) { dot.className = 'dot dot-live'; }
+                        break;
+                    case 'waiting':
+                        if (badge) { badge.className = 'sync-badge sync-waiting'; badge.innerHTML = '⏳ Telefon kutilmoqda...'; }
+                        if (quizBadge) { quizBadge.className = 'sync-badge sync-waiting'; quizBadge.innerHTML = '⏳ Kutilmoqda'; }
+                        break;
+                    default:
+                        if (badge) { badge.className = 'sync-badge sync-off'; badge.innerHTML = '⚪ Sinxron oʻchiq'; }
+                        if (quizBadge) { quizBadge.className = 'sync-badge sync-off'; quizBadge.innerHTML = '⚪ Telefon yoʻq'; }
+                }
+            }
+
+            // ═══════════════════════════════════════
+            // RECEIVE MESSAGES FROM SCANNER
+            // ═══════════════════════════════════════
+            function handleScannerMessage(msg) {
+                console.log('[DISPLAY] Received:', msg.type);
+
+                switch (msg.type) {
+                    case 'scanner-ready':
+                        console.log('[DISPLAY] Scanner ready!');
+                        // If quiz already started, tell scanner which question
+                        if (!$('welcomeScreen').classList.contains('hidden') === false) {
+                            // Quiz is running — tell scanner
+                            syncSend({ type: 'goto', q: currentQ });
+                        }
+                        break;
+
+                    case 'scan':
+                        // Scanning progress (not yet locked)
+                        if (msg.q === currentQ) {
+                            liveResults[msg.mid] = {
+                                name: msg.name,
+                                answer: msg.answer,
+                                pct: msg.pct,
+                                locked: false,
+                                isCorrect: false
+                            };
+                            updateLivePanel();
+                        }
+                        break;
+
+                    case 'lock':
+                        // Answer locked!
+                        if (msg.q === currentQ) {
+                            liveResults[msg.mid] = {
+                                name: msg.name,
+                                answer: msg.answer,
+                                isCorrect: msg.isCorrect,
+                                locked: true,
+                                pct: 100
+                            };
+                            // Save to all results
+                            if (!allScanResults[msg.q]) allScanResults[msg.q] = {};
+                            allScanResults[msg.q][msg.mid] = {
+                                answer: msg.answer,
+                                isCorrect: msg.isCorrect,
+                                name: msg.name
+                            };
+                            updateLivePanel();
+                            updateOptionBars();
+                        }
+                        break;
+
+                    case 'pong':
+                        break;
+                }
+            }
+
+            // ═══════════════════════════════════════
+            // QUIZ FLOW — MASTER CONTROLS
+            // ═══════════════════════════════════════
+            function startQuiz() {
+                $('welcomeScreen').classList.add('hidden');
+                $('quizScreen').classList.remove('hidden');
+                $('qTotal').textContent = testData.questions.length;
+                $('qTestTitle').textContent = testData.title;
+                showQuestion(0);
+            }
+
+            function showQuestion(idx) {
+                if (idx < 0 || idx >= testData.questions.length) return;
+                currentQ = idx;
+                liveResults = {};  // Reset for new question
+
+                // Restore from saved results
+                if (allScanResults[idx]) {
+                    for (var mid in allScanResults[idx]) {
+                        if (allScanResults[idx].hasOwnProperty(mid)) {
+                            var r = allScanResults[idx][mid];
+                            liveResults[mid] = {
+                                name: r.name,
+                                answer: r.answer,
+                                isCorrect: r.isCorrect,
+                                locked: true,
+                                pct: 100
+                            };
+                        }
+                    }
+                }
+
+                var q = testData.questions[idx];
+                $('qNum').textContent = idx + 1;
+                $('qText').textContent = (idx + 1) + '. ' + q.text;
+
+                // Options
+                var letters = ['A', 'B', 'C', 'D'];
+                var colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444'];
+                var ol = $('optionsList');
+                ol.innerHTML = '';
+                for (var i = 0; i < q.options.length && i < 4; i++) {
+                    var li = document.createElement('li');
+                    li.className = 'option-row';
+                    li.setAttribute('data-idx', i);
+                    li.innerHTML =
+                        '<div class="option-letter">' + letters[i] + '</div>' +
+                        '<div class="option-text">' + q.options[i] + '</div>' +
+                        '<div class="option-bar"><div class="option-bar-fill" id="bar-' + i + '" style="width:0;background:' + colors[i] + '"></div></div>' +
+                        '<div class="option-count" id="count-' + i + '">0</div>';
+                    ol.appendChild(li);
+                }
+
+                // Controls
+                $('prevBtn').disabled = (idx === 0);
+                $('nextBtn').style.display = (idx === testData.questions.length - 1) ? 'none' : '';
+                $('finishBtn').style.display = (idx === testData.questions.length - 1) ? '' : 'none';
+
+                updateLivePanel();
+
+                // SYNC: tell scanner to go to this question
+                syncSend({ type: 'goto', q: idx });
+            }
+
+            function updateOptionBars() {
+                // Count votes per option for current question
+                var counts = [0, 0, 0, 0];
+                var total = 0;
+                for (var mid in liveResults) {
+                    if (!liveResults.hasOwnProperty(mid)) continue;
+                    var r = liveResults[mid];
+                    if (r.locked) {
+                        var letters = ['A', 'B', 'C', 'D'];
+                        var idx = letters.indexOf(r.answer);
+                        if (idx >= 0) { counts[idx]++; total++; }
+                    }
+                }
+
+                for (var i = 0; i < 4; i++) {
+                    var bar = $('bar-' + i);
+                    var cnt = $('count-' + i);
+                    if (bar) {
+                        var pct = total > 0 ? (counts[i] / total * 100) : 0;
+                        bar.style.width = pct + '%';
+                    }
+                    if (cnt) cnt.textContent = counts[i];
+                }
+            }
+
+            function updateLivePanel() {
+                var list = $('liveResultsList');
+                list.innerHTML = '';
+
+                var correct = 0, wrong = 0, scanning = 0;
+
+                for (var mid in liveResults) {
+                    if (!liveResults.hasOwnProperty(mid)) continue;
+                    var r = liveResults[mid];
+
+                    var div = document.createElement('div');
+                    if (r.locked) {
+                        div.className = 'result-entry ' + (r.isCorrect ? 'locked-correct' : 'locked-wrong');
+                        div.innerHTML =
+                            '<span class="re-name">' + r.name + '</span>' +
+                            '<span class="re-answer">' + r.answer + '</span>' +
+                            '<span class="re-status">' + (r.isCorrect ? '✅' : '❌') + '</span>';
+                        if (r.isCorrect) correct++; else wrong++;
+                    } else {
+                        div.className = 'result-entry scanning';
+                        div.innerHTML =
+                            '<span class="re-name">' + r.name + '</span>' +
+                            '<span class="re-answer" style="color:var(--warn)">' + r.answer + '</span>' +
+                            '<span class="re-pct">' + (r.pct || 0) + '%</span>';
+                        scanning++;
+                    }
+                    list.appendChild(div);
+                }
+
+                $('sCorrect').textContent = correct;
+                $('sWrong').textContent = wrong;
+                $('sTotal').textContent = correct + wrong + scanning;
+            }
+
+            // ═══════════════════════════════════════
+            // LEADERBOARD
+            // ═══════════════════════════════════════
+            function showLeaderboard() {
+                $('quizScreen').classList.add('hidden');
+                $('leaderboardScreen').classList.remove('hidden');
+
+                var scores = {};
+                var totalQ = testData.questions.length;
+
+                for (var qIdx in allScanResults) {
+                    if (!allScanResults.hasOwnProperty(qIdx)) continue;
+                    for (var mid in allScanResults[qIdx]) {
+                        if (!allScanResults[qIdx].hasOwnProperty(mid)) continue;
+                        var r = allScanResults[qIdx][mid];
+                        if (!scores[mid]) scores[mid] = { name: r.name, correct: 0, total: 0 };
+                        scores[mid].total++;
+                        if (r.isCorrect) scores[mid].correct++;
+                    }
+                }
+
+                var sorted = [];
+                for (var sid in scores) { if (scores.hasOwnProperty(sid)) sorted.push(scores[sid]); }
+                // QR: sort by correct only, no time
+                sorted.sort(function (a, b) { return b.correct - a.correct; });
+
+                var medals = ['🥇', '🥈', '🥉'];
+                var rankClass = ['gold', 'silver', 'bronze'];
+                var list = $('lbList');
+                list.innerHTML = '';
+
+                $('lbSubtitle').textContent = testData.title + ' — ' + totalQ + ' ta savol';
+
+                for (var i = 0; i < sorted.length; i++) {
+                    var s = sorted[i];
+                    var pct = totalQ > 0 ? Math.round((s.correct / totalQ) * 100) : 0;
+                    var row = document.createElement('div');
+                    row.className = 'lb-row' + (i < 3 ? ' ' + rankClass[i] : '');
+                    row.innerHTML =
+                        '<div class="lb-rank">' + (i < 3 ? medals[i] : (i + 1)) + '</div>' +
+                        '<div class="lb-name">' + s.name + '</div>' +
+                        '<div class="lb-score">' + s.correct + '/' + totalQ + '</div>' +
+                        '<div class="lb-pct">' + pct + '%</div>';
+                    list.appendChild(row);
+                }
+
+                if (sorted.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">Natijalar topilmadi</div>';
+                }
+
+                // SYNC: tell scanner to finish too
+                syncSend({
+                    type: 'finish',
+                    allResults: allScanResults
+                });
+            }
+
+            // ═══════════════════════════════════════
+            // SEND RESULTS — tell scanner to sendData
+            // ═══════════════════════════════════════
+            $('sendResultsBtn').onclick = function () {
+                var statusEl = $('sendStatus');
+
+                if (scannerConnected) {
+                    // Scanner will call tg.sendData()
+                    syncSend({ type: 'sendResults' });
+                    statusEl.textContent = '📤 Telefonga yuborildi — bot orqali guruhga ketadi...';
+                    statusEl.style.color = '#22c55e';
+                    this.disabled = true;
+                } else {
+                    statusEl.textContent = '⚠️ Telefon ulanmagan. Skanerni oching.';
+                    statusEl.style.color = '#f59e0b';
+                }
+            };
+
+            // ═══════════════════════════════════════
+            // CONTROLS
+            // ═══════════════════════════════════════
+            $('startQuizBtn').onclick = function () {
+                startQuiz();
+            };
+
+            $('prevBtn').onclick = function () {
+                if (currentQ > 0) showQuestion(currentQ - 1);
+            };
+
+            $('nextBtn').onclick = function () {
+                if (currentQ < testData.questions.length - 1) {
+                    showQuestion(currentQ + 1);
+                }
+            };
+
+            $('finishBtn').onclick = function () {
+                showLeaderboard();
+            };
+
+            // ═══════════════════════════════════════
+            // INIT
+            // ═══════════════════════════════════════
+            loadTestData();
+            initSync();
+            console.log('[DISPLAY] Master v2 ready. Session: ' + sessionId);
+
+        })();
+    </script>
+</body>
+
+</html>

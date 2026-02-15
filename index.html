@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLabQR Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+
+<body>
+
+    <!-- === SESSION START SCREEN === -->
+    <div id="sessionScreen" class="session-screen">
+        <div class="session-header">
+            <div class="session-icon">📷</div>
+            <h2>LLabQR Scanner</h2>
+        </div>
+        <div class="session-info">
+            <div class="session-card">
+                <span class="label">📝 Test:</span>
+                <span class="value" id="sessionTitle">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">🏫 Sinf:</span>
+                <span class="value" id="sessionClass">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">❓ Savollar:</span>
+                <span class="value" id="sessionCount">—</span>
+            </div>
+            <div class="session-card">
+                <span class="label">👥 O'quvchilar:</span>
+                <span class="value" id="sessionStudents">—</span>
+            </div>
+        </div>
+        <button id="startScannerBtn" class="btn big-start">▶ Skanerni boshlash</button>
+        <p class="session-hint">Kamerani ArUco markerlarga qarating</p>
+    </div>
+
+    <!-- === SCANNER SCREEN === -->
+    <div id="scannerScreen" class="scanner-hidden">
+        <!-- Debug Console (visible during testing) -->
+        <div id="debugConsole"></div>
+        <!-- Top bar -->
+        <div class="top-bar">
+            <div class="header">
+                <h3>📷 <span id="scannerTitle">LLabQR</span></h3>
+                <span id="qcount">Savol: <span id="current-q">1</span>/<span id="total-q">10</span></span>
+            </div>
+            <div class="stats">
+                <div class="stat-box correct">✅ <span id="correct-count">0</span></div>
+                <div class="stat-box wrong">❌ <span id="wrong-count">0</span></div>
+                <div class="stat-box total">👥 <span id="total-scanned">0</span></div>
+            </div>
+            <div id="syncStatus" style="text-align:center;font-size:11px;padding:2px 0;color:#64748b;">⚪ Sinxron o'chiq
+            </div>
+        </div>
+
+        <!-- Question + correct answer display -->
+        <div class="question-bar">
+            <div class="q-text" id="questionText">Savol matni...</div>
+            <div class="correct-ans" id="correctAnsDisplay" style="display:none;">To'g'ri: <strong
+                    id="correctLetter">A</strong></div>
+        </div>
+
+        <!-- Camera settings -->
+        <div class="camera-settings">
+            <select id="cameraSelect">
+                <option value="">Kamerani tanlang...</option>
+            </select>
+            <button id="switchCameraBtn" class="btn small">🔄</button>
+        </div>
+
+        <!-- Camera -->
+        <div class="camera-container">
+            <video id="videoInput" playsinline autoplay muted style="display:none;"></video>
+            <canvas id="canvasOutput"></canvas>
+            <div id="loadingMessage">Kamera yuklanmoqda...</div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-container">
+            <h4>Natijalar:</h4>
+            <ul id="results-list"></ul>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="prev-question-btn" class="btn secondary">⬅️</button>
+            <button id="next-question-btn" class="btn primary">Keyingi ➡️</button>
+            <button id="finish-test-btn" class="btn danger">🏁 Tugatish</button>
+        </div>
+    </div>
+
+    <!-- === LEADERBOARD SCREEN === -->
+    <div id="leaderboardScreen" class="scanner-hidden leaderboard-screen">
+        <div class="lb-header">
+            <div class="lb-trophy">🏆</div>
+            <h2>Yakuniy natijalar</h2>
+        </div>
+        <div class="lb-list" id="lbList"></div>
+        <button id="sendResultsBtn" class="btn big-start">📤 Natijalarni botga yuborish</button>
+        <p id="sendStatus" style="text-align:center;margin-top:12px;font-size:14px;color:#94a3b8;"></p>
+    </div>
+
+    <!-- PeerJS for real-time sync with display -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- ORIGINAL CV + ArUco libraries (proven to work) -->
+    <script src="cv.js"></script>
+    <script src="aruco.js"></script>
+    <!-- App logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>

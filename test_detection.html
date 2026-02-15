@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>ArUco Detection Test</title>
+          <style>
+                    * {
+                              margin: 0;
+                              padding: 0;
+                              box-sizing: border-box;
+                    }
+
+                    body {
+                              font-family: Arial, sans-serif;
+                              background: #111;
+                              color: #fff;
+                              padding: 10px;
+                    }
+
+                    h2 {
+                              text-align: center;
+                              margin-bottom: 10px;
+                    }
+
+                    canvas {
+                              border: 1px solid #444;
+                              display: block;
+                              max-width: 100%;
+                    }
+
+                    #debug {
+                              background: #1a1a2e;
+                              color: lime;
+                              font-family: monospace;
+                              font-size: 12px;
+                              padding: 10px;
+                              border-radius: 8px;
+                              max-height: 300px;
+                              overflow-y: auto;
+                              margin-top: 10px;
+                              white-space: pre-wrap;
+                    }
+
+                    .marker-test {
+                              display: flex;
+                              gap: 8px;
+                              flex-wrap: wrap;
+                              margin-top: 10px;
+                              justify-content: center;
+                    }
+
+                    button {
+                              padding: 10px 20px;
+                              background: #6366f1;
+                              color: white;
+                              border: none;
+                              border-radius: 8px;
+                              cursor: pointer;
+                              font-size: 14px;
+                              margin: 5px;
+                    }
+
+                    button:hover {
+                              background: #4f46e5;
+                    }
+
+                    .stats {
+                              font-size: 18px;
+                              text-align: center;
+                              margin: 10px 0;
+                    }
+
+                    .green {
+                              color: #22c55e;
+                    }
+
+                    .red {
+                              color: #ef4444;
+                    }
+
+                    .blue {
+                              color: #3b82f6;
+                    }
+
+                    video {
+                              display: none;
+                    }
+
+                    .canvases {
+                              display: flex;
+                              gap: 10px;
+                              flex-wrap: wrap;
+                              justify-content: center;
+                    }
+
+                    .canvases div {
+                              text-align: center;
+                    }
+
+                    .canvases canvas {
+                              background: #222;
+                    }
+          </style>
+</head>
+
+<body>
+          <h2>🔍 ArUco Detection Test v2</h2>
+
+          <div style="text-align:center; margin-bottom:10px;">
+                    <button onclick="testWithImage()">🖼️ Rasm bilan test (ID 0-5)</button>
+                    <button onclick="startCamera()">📷 Kamerani ochish</button>
+                    <select id="cameraSelect"
+                              style="padding:8px;background:#333;color:#fff;border:1px solid #555;border-radius:6px;">
+                              <option value="">Kamerani tanlang</option>
+                    </select>
+          </div>
+
+          <div class="stats">
+                    <span class="green">✅ Topildi: <strong id="foundCount">0</strong></span>
+                    <span class="blue">🆔 IDs: <strong id="foundIds">—</strong></span>
+          </div>
+
+          <div class="canvases">
+                    <div>
+                              <div>Scanner Canvas</div>
+                              <canvas id="mainCanvas" width="640" height="480"></canvas>
+                    </div>
+          </div>
+
+          <div id="debug">ArUco Detection Test v2\n</div>
+
+          <h3 style="text-align:center;margin-top:15px;">📋 Markerlar (ID 0-7)</h3>
+          <div class="marker-test" id="testMarkers"></div>
+
+          <video id="video" playsinline autoplay muted></video>
+
+          <script src="cv.js"></script>
+          <script src="aruco.js"></script>
+
+          <script>
+                    const video = document.getElementById('video');
+                    const canvas = document.getElementById('mainCanvas');
+                    const ctx = canvas.getContext('2d');
+                    const debugEl = document.getElementById('debug');
+                    let detector = new AR.Detector();
+                    let stream = null;
+                    let detecting = false;
+
+                    function log(msg) {
+                              const time = new Date().toLocaleTimeString();
+                              debugEl.textContent += `[${time}] ${msg}\n`;
+                              debugEl.scrollTop = debugEl.scrollHeight;
+                    }
+
+                    // === PATTERN GENERATION ===
+                    const VALID_ROWS = [
+                              [1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0]
+                    ];
+
+                    function generatePattern(id) {
+                              const pattern = [];
+                              for (let row = 0; row < 5; row++) {
+                                        const shift = (4 - row) * 2;
+                                        const digit = (id >> shift) & 3;
+                                        pattern.push([...VALID_ROWS[digit]]);
+                              }
+                              return pattern;
+                    }
+
+                    function drawMarker(id, size) {
+                              const c = document.createElement('canvas');
+                              c.width = size; c.height = size;
+                              const cx = c.getContext('2d');
+                              const cell = size / 7;
+                              // Fill all black (border)
+                              cx.fillStyle = '#000';
+                              cx.fillRect(0, 0, size, size);
+                              // Inner 5x5 pattern: 1=WHITE, 0=BLACK
+                              const p = generatePattern(id);
+                              for (let i = 0; i < 5; i++) {
+                                        for (let j = 0; j < 5; j++) {
+                                                  cx.fillStyle = p[i][j] === 1 ? '#fff' : '#000';
+                                                  cx.fillRect((j + 1) * cell, (i + 1) * cell, cell, cell);
+                                        }
+                              }
+                              return c;
+                    }
+
+                    function verifyId(id) {
+                              const p = generatePattern(id);
+                              let computed = 0;
+                              for (let i = 0; i < 5; i++) {
+                                        computed <<= 1; computed |= p[i][1];
+                                        computed <<= 1; computed |= p[i][3];
+                              }
+                              return computed === id;
+                    }
+
+                    // === SHOW TEST MARKERS ===
+                    function showTestMarkers() {
+                              const container = document.getElementById('testMarkers');
+                              container.innerHTML = '';
+                              for (let i = 0; i < 8; i++) {
+                                        const wrap = document.createElement('div');
+                                        wrap.style.textAlign = 'center';
+                                        const mc = drawMarker(i, 80);
+                                        const label = document.createElement('div');
+                                        label.textContent = `ID ${i} ${verifyId(i) ? '✅' : '❌'}`;
+                                        label.style.fontSize = '11px';
+                                        label.style.marginTop = '4px';
+                                        wrap.appendChild(mc);
+                                        wrap.appendChild(label);
+                                        container.appendChild(wrap);
+                              }
+                    }
+
+                    // === IMAGE TEST WITH NOISE (simulates camera capture) ===
+                    function testWithImage() {
+                              log("🖼️ Testing detection with simulated camera image...");
+
+                              const W = 640, H = 480;
+                              canvas.width = W;
+                              canvas.height = H;
+
+                              // Light gray background (not pure white — simulates paper)
+                              ctx.fillStyle = '#e0e0e0';
+                              ctx.fillRect(0, 0, W, H);
+
+                              // Draw multiple markers at different positions
+                              const markers = [
+                                        { id: 0, x: 40, y: 40, size: 140 },
+                                        { id: 1, x: 220, y: 40, size: 140 },
+                                        { id: 2, x: 400, y: 40, size: 140 },
+                                        { id: 3, x: 40, y: 220, size: 140 },
+                                        { id: 4, x: 220, y: 220, size: 140 },
+                                        { id: 5, x: 400, y: 220, size: 140 }
+                              ];
+
+                              markers.forEach(m => {
+                                        // White border around marker (like paper around printed marker)
+                                        ctx.fillStyle = '#f0f0f0';
+                                        ctx.fillRect(m.x - 10, m.y - 10, m.size + 20, m.size + 20);
+                                        // Draw the marker
+                                        const mc = drawMarker(m.id, m.size);
+                                        ctx.drawImage(mc, m.x, m.y);
+                              });
+
+                              // Add realistic camera noise to the entire image
+                              const imageData = ctx.getImageData(0, 0, W, H);
+                              const data = imageData.data;
+                              for (let i = 0; i < data.length; i += 4) {
+                                        const noise = (Math.random() - 0.5) * 30; // ±15 noise
+                                        data[i] = Math.max(0, Math.min(255, data[i] + noise));     // R
+                                        data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise)); // G
+                                        data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise)); // B
+                              }
+                              ctx.putImageData(imageData, 0, 0);
+
+                              // Now detect
+                              const finalImageData = ctx.getImageData(0, 0, W, H);
+                              log(`Image: ${W}x${H}, ${finalImageData.data.length} bytes`);
+
+                              try {
+                                        // Step-by-step detection with logging
+                                        const det = new AR.Detector();
+
+                                        // Step 1: Grayscale
+                                        CV.grayscale(finalImageData, det.grey);
+                                        log(`1. Grayscale: ${det.grey.width}x${det.grey.height}, data length: ${det.grey.data.length}`);
+
+                                        // Step 2: Adaptive threshold
+                                        CV.adaptiveThreshold(det.grey, det.thres, 2, 7);
+                                        log(`2. AdaptiveThreshold: data length: ${det.thres.data.length}`);
+
+                                        // Count foreground pixels
+                                        let fgCount = 0;
+                                        for (let i = 0; i < det.thres.data.length; i++) {
+                                                  if (det.thres.data[i] > 0) fgCount++;
+                                        }
+                                        log(`   Foreground pixels: ${fgCount} / ${det.thres.data.length} (${(fgCount / det.thres.data.length * 100).toFixed(1)}%)`);
+
+                                        // Step 3: Find contours
+                                        det.contours = CV.findContours(det.thres, det.binary);
+                                        log(`3. Contours found: ${det.contours.length}`);
+
+                                        // Step 4: Find candidates
+                                        const minSize = finalImageData.width * 0.20;
+                                        det.candidates = det.findCandidates(det.contours, minSize, 0.05, 10);
+                                        log(`4. Candidates (before filter): ${det.candidates.length} (minSize=${minSize})`);
+
+                                        det.candidates = det.clockwiseCorners(det.candidates);
+                                        det.candidates = det.notTooNear(det.candidates, 10);
+                                        log(`   Candidates (after filter): ${det.candidates.length}`);
+
+                                        // Step 5: Find markers
+                                        const result = det.findMarkers(det.grey, det.candidates, 49);
+                                        log(`5. MARKERS DETECTED: ${result.length}`);
+
+                                        if (result.length > 0) {
+                                                  document.getElementById('foundCount').textContent = result.length;
+                                                  const ids = result.map(m => m.id).join(', ');
+                                                  document.getElementById('foundIds').textContent = ids;
+
+                                                  result.forEach(m => {
+                                                            const c = m.corners;
+                                                            let minY = Infinity, topIdx = -1;
+                                                            c.forEach((p, i) => { if (p.y < minY) { minY = p.y; topIdx = i; } });
+                                                            const ans = ['A', 'B', 'C', 'D'][topIdx];
+
+                                                            ctx.strokeStyle = '#00ff00';
+                                                            ctx.lineWidth = 3;
+                                                            ctx.beginPath();
+                                                            ctx.moveTo(c[0].x, c[0].y);
+                                                            c.forEach(p => ctx.lineTo(p.x, p.y));
+                                                            ctx.closePath();
+                                                            ctx.stroke();
+
+                                                            const label = `ID:${m.id} → ${ans}`;
+                                                            ctx.fillStyle = '#00ff00';
+                                                            ctx.font = 'bold 16px Arial';
+                                                            ctx.fillRect(c[0].x, c[0].y - 24, ctx.measureText(label).width + 8, 22);
+                                                            ctx.fillStyle = '#000';
+                                                            ctx.fillText(label, c[0].x + 4, c[0].y - 6);
+
+                                                            log(`   ✅ ID:${m.id}, Answer:${ans}`);
+                                                  });
+                                                  log("🎉 DETECTION WORKS! Scanner should work with real camera.");
+                                        } else {
+                                                  log("⚠️ No markers detected. See steps above for diagnosis.");
+                                                  if (det.candidates.length === 0) {
+                                                            log("💡 Issue: No candidates found. Contour detection may need more contrast.");
+                                                  }
+                                        }
+
+                              } catch (e) {
+                                        log(`❌ Error: ${e.message}\n${e.stack}`);
+                              }
+                    }
+
+                    // === CAMERA ===
+                    async function startCamera() {
+                              try {
+                                        if (stream) stream.getTracks().forEach(t => t.stop());
+                                        const select = document.getElementById('cameraSelect');
+                                        const deviceId = select.value;
+                                        const constraints = {
+                                                  video: deviceId
+                                                            ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+                                                            : { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                                        };
+                                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                                        video.srcObject = stream;
+                                        await video.play();
+
+                                        const devices = await navigator.mediaDevices.enumerateDevices();
+                                        const cameras = devices.filter(d => d.kind === 'videoinput');
+                                        select.innerHTML = '';
+                                        cameras.forEach((cam, i) => {
+                                                  const opt = document.createElement('option');
+                                                  opt.value = cam.deviceId;
+                                                  opt.textContent = cam.label || `Kamera ${i + 1}`;
+                                                  select.appendChild(opt);
+                                        });
+
+                                        log(`📷 Camera: ${video.videoWidth}x${video.videoHeight}`);
+                                        video.addEventListener('loadedmetadata', () => {
+                                                  canvas.width = video.videoWidth || 640;
+                                                  canvas.height = video.videoHeight || 480;
+                                                  if (!detecting) { detecting = true; requestAnimationFrame(tick); }
+                                        });
+                              } catch (e) {
+                                        log(`❌ Camera error: ${e.message}`);
+                              }
+                    }
+
+                    let frameCount = 0, lastLog = 0;
+                    function tick() {
+                              if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                                        canvas.width = video.videoWidth;
+                                        canvas.height = video.videoHeight;
+                                        ctx.drawImage(video, 0, 0);
+                                        try {
+                                                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                                  const markers = detector.detect(imageData);
+                                                  frameCount++;
+                                                  if (frameCount - lastLog >= 30) {
+                                                            log(`Frame ${frameCount}: ${markers.length} markers`);
+                                                            lastLog = frameCount;
+                                                  }
+                                                  if (markers.length > 0) {
+                                                            document.getElementById('foundCount').textContent = markers.length;
+                                                            document.getElementById('foundIds').textContent = markers.map(m => m.id).join(', ');
+                                                            markers.forEach(m => {
+                                                                      const c = m.corners;
+                                                                      let minY = Infinity, topIdx = -1;
+                                                                      c.forEach((p, i) => { if (p.y < minY) { minY = p.y; topIdx = i; } });
+                                                                      const ans = ['A', 'B', 'C', 'D'][topIdx];
+                                                                      ctx.strokeStyle = '#00ff00'; ctx.lineWidth = 3;
+                                                                      ctx.beginPath(); ctx.moveTo(c[0].x, c[0].y);
+                                                                      c.forEach(p => ctx.lineTo(p.x, p.y));
+                                                                      ctx.closePath(); ctx.stroke();
+                                                                      ctx.fillStyle = 'rgba(0,255,0,0.15)'; ctx.fill();
+                                                                      const label = `ID:${m.id}→${ans}`;
+                                                                      ctx.fillStyle = '#0f0'; ctx.font = 'bold 18px Arial';
+                                                                      ctx.fillRect(c[0].x, c[0].y - 28, ctx.measureText(label).width + 8, 24);
+                                                                      ctx.fillStyle = '#000'; ctx.fillText(label, c[0].x + 4, c[0].y - 8);
+                                                                      log(`✅ ID:${m.id}, Ans:${ans}`);
+                                                            });
+                                                  }
+                                        } catch (e) { }
+                              }
+                              requestAnimationFrame(tick);
+                    }
+
+                    // Init
+                    showTestMarkers();
+                    log("CV: " + (typeof CV !== 'undefined' ? '✅' : '❌'));
+                    log("AR: " + (typeof AR !== 'undefined' ? '✅' : '❌'));
+          </script>
+</body>
+
+</html>
