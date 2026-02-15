@@ -684,11 +684,13 @@
                     if (!sessionId) sessionId = 'llab-demo-' + Date.now() % 100000;
                 }
 
-                $('wTitle').textContent = testData.title;
-                $('wCount').textContent = testData.questions.length + ' ta';
-                $('wClass').textContent = testData.class_name || '—';
-                $('wStudents').textContent = testData.students.length > 0 ? testData.students.length + ' ta' : '—';
-                document.title = 'LLabQR — ' + testData.title;
+                if (testData) {
+                    if ($('wTitle')) $('wTitle').textContent = testData.title;
+                    if ($('wCount')) $('wCount').textContent = testData.questions.length + ' ta';
+                    if ($('wClass')) $('wClass').textContent = testData.class_name || '—';
+                    if ($('wStudents')) $('wStudents').textContent = testData.students.length > 0 ? testData.students.length + ' ta' : '—';
+                    document.title = 'LLabQR — ' + testData.title;
+                }
             }
 
             // ═══════════════════════════════════════
@@ -699,7 +701,7 @@
 
             function initSync() {
                 if (typeof mqtt === 'undefined') {
-                    log('No MQTT lib, retrying...');
+                    // console.log('No MQTT lib, retrying...');
                     setTimeout(initSync, 1000);
                     return;
                 }
@@ -707,12 +709,6 @@
                 // Load chat_id if available
                 if (testData && testData.chat_id) chatId = testData.chat_id;
 
-                // Get code from session ID (llab-{test}-{code})
-                if (typeof mqtt === 'undefined') {
-                    log('No MQTT lib, retrying...');
-                    setTimeout(initSync, 1000);
-                    return;
-                }
 
                 // Get code from session ID (llab-{test}-{code})
                 if (sessionId) {
