@@ -694,7 +694,21 @@
     function sendResults() {
         var statusEl = $('sendStatus');
         try {
+            // Save current question results first
             allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+
+            // 1. MQTT SEND (Python Bot) - Works in Browser & WebApp
+            if (mqttClient && mqttClient.connected && testData.chat_id) {
+                var mqttPayload = {
+                    chat_id: testData.chat_id,
+                    results: allResults
+                };
+                mqttClient.publish('llab/results', JSON.stringify(mqttPayload), { qos: 0 });
+                if (statusEl) { statusEl.textContent = '✅ Botga yuborildi!'; statusEl.style.color = '#22c55e'; }
+                dbg('Results sent via MQTT to ' + testData.chat_id);
+            }
+
+            // 2. TG WEBAPP SEND (Legacy/Fallback)
             var data = {
                 a: 'llab_qr_results',
                 t: testData.test_id,
@@ -738,8 +752,11 @@
                 if (statusEl) { statusEl.textContent = '✅ Yuborildi!'; statusEl.style.color = '#22c55e'; }
                 setTimeout(function () { try { tg.close(); } catch (e) { } }, 2000);
             } else {
-                if (statusEl) { statusEl.textContent = '⚠️ TG topilmadi'; statusEl.style.color = '#ffaa00'; }
-                dbg('sendData: no TG');
+                // Only show warning if MQTT also failed (i.e. we didn't update status yet)
+                if (!mqttClient || !mqttClient.connected) {
+                    if (statusEl) { statusEl.textContent = '⚠️ TG/MQTT topilmadi'; statusEl.style.color = '#ffaa00'; }
+                }
+                dbg('sendData: TG not available');
             }
         } catch (e) {
             if (statusEl) { statusEl.textContent = '❌ ' + e.message; statusEl.style.color = '#ff3344'; }
