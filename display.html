@@ -800,21 +800,25 @@
             function updateSyncBadge(status) {
                 var badge = $('syncBadge');
                 var quizBadge = $('quizSyncBadge');
+                var startBtn = $('startQuizBtn');
 
                 switch (status) {
                     case 'connected':
                         if (badge) { badge.className = 'sync-badge sync-ok'; badge.innerHTML = '🟢 Telefon ulangan!'; }
                         if (quizBadge) { quizBadge.className = 'sync-badge sync-ok'; quizBadge.innerHTML = '🟢 Ulangan'; }
+                        if (startBtn) { startBtn.innerHTML = '▶️ Boshlash (Skaner Ulangan!)'; startBtn.style.background = '#22c55e'; }
                         var dot = $('liveDot');
                         if (dot) { dot.className = 'dot dot-live'; }
                         break;
                     case 'waiting':
                         if (badge) { badge.className = 'sync-badge sync-waiting'; badge.innerHTML = '⏳ Telefon kutilmoqda...'; }
                         if (quizBadge) { quizBadge.className = 'sync-badge sync-waiting'; quizBadge.innerHTML = '⏳ Kutilmoqda'; }
+                        if (startBtn) { startBtn.innerHTML = '▶️ Boshlash (telefonsiz)'; startBtn.style.background = ''; }
                         break;
                     default:
                         if (badge) { badge.className = 'sync-badge sync-off'; badge.innerHTML = '⚪ Sinxron oʻchiq'; }
                         if (quizBadge) { quizBadge.className = 'sync-badge sync-off'; quizBadge.innerHTML = '⚪ Telefon yoʻq'; }
+                        if (startBtn) { startBtn.innerHTML = '▶️ Boshlash (telefonsiz)'; startBtn.style.background = ''; }
                 }
             }
 
