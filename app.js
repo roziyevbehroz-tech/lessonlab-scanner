@@ -712,13 +712,25 @@
         var totalQ = testData.questions.length;
         var list = $('lbList');
         list.innerHTML = '';
+
+        var currentRank = 1;
+        var displayRank = 1;
+
         for (var i = 0; i < sorted.length; i++) {
             var s = sorted[i];
+
+            // Standard Competition Ranking: 1, 1, 3...
+            if (i > 0 && s.correct < sorted[i - 1].correct) {
+                displayRank = i + 1;
+            }
+
             var p = totalQ > 0 ? Math.round((s.correct / totalQ) * 100) : 0;
             var row = document.createElement('div');
             row.className = 'lb-row';
+
+            var medalIdx = displayRank - 1;
             row.innerHTML =
-                '<div class="lb-rank">' + (i < 3 ? medals[i] : (i + 1)) + '</div>' +
+                '<div class="lb-rank">' + (medalIdx < 3 ? medals[medalIdx] : displayRank) + '</div>' +
                 '<div class="lb-name">' + s.name + '</div>' +
                 '<div class="lb-score">' + s.correct + '/' + totalQ + ' (' + p + '%)</div>';
             list.appendChild(row);
