@@ -512,57 +512,90 @@
         var detector;
         try { detector = new AR.Detector(); } catch (e) { dbg('Detector err'); return; }
 
-        try {
-            var tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            tempStream.getTracks().forEach(function (t) { t.stop(); });
-            var devices = await navigator.mediaDevices.enumerateDevices();
-            var cams = devices.filter(function (d) { return d.kind === 'videoinput'; });
+        var btnBack = $('btnBack');
+        var btnFront = $('btnFront');
+        var btnMore = $('btnMore');
+        var camSelect = $('cameraSelect');
 
-            cameraSelect.innerHTML = '';
-            for (var ci = 0; ci < cams.length; ci++) {
-                var opt = document.createElement('option');
-                opt.value = cams[ci].deviceId;
-                opt.textContent = cams[ci].label || ('camera ' + ci);
-                cameraSelect.appendChild(opt);
-            }
-            for (var bi = 0; bi < cams.length; bi++) {
-                if (/back|rear|environment/i.test(cams[bi].label)) {
-                    cameraSelect.value = cams[bi].deviceId;
-                    break;
-                }
-            }
-        } catch (e) {
-            dbg('Cam err: ' + e.message);
-            if (loadingMsg) loadingMsg.textContent = '⚠️ Kamera ruxsati berilmadi!';
-            return;
+        function updateCamUI(mode, deviceId) {
+            [btnBack, btnFront, btnMore].forEach(b => b.classList.remove('active'));
+            if (mode === 'environment') btnBack.classList.add('active');
+            else if (mode === 'user') btnFront.classList.add('active');
+            else btnMore.classList.add('active');
         }
 
-        async function openCamera(deviceId) {
-            if (cameraStream) cameraStream.getTracks().forEach(function (t) { t.stop(); });
-            var constraints = {
-                audio: false,
-                video: deviceId
-                    ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-                    : { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
-            };
+        async function openCamera(deviceId, facingMode) {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(function (t) { t.stop(); });
+            }
+
+            var constraints = { audio: false, video: {} };
+            if (deviceId) {
+                constraints.video.deviceId = { exact: deviceId };
+            } else if (facingMode) {
+                constraints.video.facingMode = facingMode;
+            } else {
+                constraints.video.facingMode = 'environment';
+            }
+
+            // Standard resolution for performance
+            constraints.video.width = { ideal: 640 };
+            constraints.video.height = { ideal: 480 };
+
             try {
                 cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                var track = cameraStream.getVideoTracks()[0];
+                var settings = track.getSettings();
+
+                // Persistence & UI Sync
+                if (settings.deviceId) localStorage.setItem('llab_preferred_cam', settings.deviceId);
+                updateCamUI(settings.facingMode, settings.deviceId);
+
+                videoEl.srcObject = cameraStream;
+                await videoEl.play();
+                if (loadingMsg) loadingMsg.style.display = 'none';
+
+                // Enumerate devices ONCE after first success to populate "More" list without extra prompts
+                refreshCameraList();
             } catch (e) {
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                dbg('Cam err: ' + e.message);
+                if (loadingMsg) loadingMsg.textContent = '⚠️ Kamera xatoligi!';
             }
-            videoEl.srcObject = cameraStream;
-            await videoEl.play();
-            if (loadingMsg) loadingMsg.style.display = 'none';
         }
 
-        cameraSelect.onchange = function () { openCamera(cameraSelect.value); };
-        $('switchCameraBtn').onclick = function () {
-            var opts = cameraSelect.options;
-            cameraSelect.selectedIndex = (cameraSelect.selectedIndex + 1) % opts.length;
-            openCamera(cameraSelect.value);
+        async function refreshCameraList() {
+            try {
+                var devices = await navigator.mediaDevices.enumerateDevices();
+                var cams = devices.filter(d => d.kind === 'videoinput');
+                camSelect.innerHTML = '';
+                cams.forEach(c => {
+                    var opt = document.createElement('option');
+                    opt.value = c.deviceId;
+                    opt.textContent = c.label || ('Kamera ' + camSelect.length);
+                    camSelect.appendChild(opt);
+                });
+            } catch (e) { }
+        }
+
+        // Button Listeners
+        btnBack.onclick = () => openCamera(null, 'environment');
+        btnFront.onclick = () => openCamera(null, 'user');
+        btnMore.onclick = () => {
+            camSelect.style.display = camSelect.style.display === 'none' ? 'block' : 'none';
+            if (camSelect.style.display === 'block') refreshCameraList();
+        };
+        camSelect.onchange = () => {
+            openCamera(camSelect.value);
+            camSelect.style.display = 'none';
         };
 
-        await openCamera(cameraSelect.value || null);
+        // Initial Start (v12.5 Persistence Logic)
+        var savedCam = localStorage.getItem('llab_preferred_cam');
+        if (savedCam) {
+            openCamera(savedCam);
+        } else {
+            openCamera(null, 'environment');
+        }
 
         // Detection loop
         running = true;

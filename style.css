@@ -215,37 +215,54 @@ html {
     margin-left: 12px;
 }
 
-/* Camera settings */
-.camera-settings {
+/* Camera settings v2 */
+.camera-settings-v2 {
     position: fixed;
     top: 138px;
     left: 0;
     right: 0;
-    background: #0d1421;
-    padding: 6px 10px;
+    background: rgba(13, 20, 33, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 10px 14px;
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
     z-index: 98;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.camera-settings select {
+.cam-btn {
     flex: 1;
-    padding: 6px 10px;
-    background: #1a2332;
-    color: #fff;
-    border: 1px solid #2a3a4a;
-    border-radius: 6px;
-    font-size: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
-.camera-settings .btn.small {
-    padding: 6px 12px;
-    font-size: 14px;
-    background: #2a3a4a;
+.cam-btn.active {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff;
-    border: none;
-    border-radius: 6px;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.cam-btn:active {
+    transform: scale(0.95);
+}
+
+.cam-btn.plus {
+    flex: 0;
+    padding: 8px 15px;
+    background: rgba(255, 255, 255, 0.08);
 }
 
 /* Debug Console — hidden by default, 5-tap to show */
