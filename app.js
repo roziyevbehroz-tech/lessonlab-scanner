@@ -28,10 +28,30 @@
         tapTimer = setTimeout(function () { tapCount = 0; }, 500);
         if (tapCount >= 5) {
             tapCount = 0;
-            debugVisible = !debugVisible;
-            if (debugEl) debugEl.style.display = debugVisible ? 'block' : 'none';
+            // Toggle debug
         }
     });
+
+    // BLOCKING OVERLAY
+    var overlay = document.createElement('div');
+    overlay.id = 'connectOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;text-align:center;padding:20px;';
+    overlay.innerHTML = '<div style="font-size:40px;margin-bottom:20px;">🛰️</div><h2 style="margin:0 0 10px 0;">Display qidirilmoqda...</h2><p style="color:#aaa;font-size:14px;margin:0;">Iltimos, kuting. Telefonda internet borligini tekshiring.</p><div style="margin-top:20px;font-size:12px;color:#666;" id="connStep">Step 1: Init Peer</div>';
+    document.body.appendChild(overlay);
+
+    function updateOverlay(msg) {
+        var el = document.getElementById('connStep');
+        if (el) el.textContent = msg;
+    }
+
+    function hideOverlay() {
+        overlay.style.display = 'none';
+    }
+
+    function showOverlay(msg) {
+        overlay.style.display = 'flex';
+        updateOverlay(msg || 'Reconnecting...');
+    }
 
     // ─── TELEGRAM WEBAPP ───
     var tg = null;
@@ -137,17 +157,17 @@
     }
 
     function connectToDisplay(displayId) {
-        if (reconnectAttempts >= MAX_RECONNECT) {
-            dbg('Max reconnect reached');
-            updateSyncUI('off');
-            return;
-        }
+        // Remove limit - retry forever
+        // if (reconnectAttempts >= MAX_RECONNECT) { ... }
 
         dbg('Connecting to ' + displayId + ' (attempt ' + (reconnectAttempts + 1) + ')');
+        updateOverlay('Step 2: Connecting to Display... (' + (reconnectAttempts + 1) + ')');
+
         if (displayConn) { try { displayConn.close(); } catch (e) { } }
 
         try {
-            displayConn = syncPeer.connect(displayId, { reliable: true });
+            // RELIABLE: FALSE for mobile speed/compatibility
+            displayConn = syncPeer.connect(displayId, { reliable: false });
         } catch (e) {
             dbg('Connect err: ' + e.message);
             scheduleReconnect(displayId);
@@ -159,6 +179,7 @@
             reconnectAttempts = 0;
             dbg('CONNECTED to display!');
             updateSyncUI('connected');
+            hideOverlay(); // UNBLOCK UI
             applySyncMode();
 
             // Tell display we're here
@@ -176,6 +197,7 @@
             synced = false;
             dbg('Display disconnected');
             updateSyncUI('connecting');
+            showOverlay('Connection lost. Reconnecting...'); // BLOCK UI
             removeSyncMode();
             scheduleReconnect(displayId);
         });
