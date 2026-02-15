@@ -363,17 +363,18 @@
         // Use atan2 to get the angle from center to corner[0]
         var angle = Math.atan2(corners[0].y - cy, corners[0].x - cx) * (180 / Math.PI);
 
-        // Final Plickers standard mapping (v12.0):
-        // A (Upright): Corner 0 at TL -> Angle [-180, -90]
-        // B (CW 90 Rotate): Corner 0 at TR -> Angle [-90, 0]
-        // C (180 Rotate): Corner 0 at BR -> Angle [0, 90]
-        // D (CCW 90 Rotate): Corner 0 at BL -> Angle [90, 180]
+        // Final Plickers standard mapping (v12.1):
+        // Plickers uses CCW rotation: A -> B -> C -> D
+        // TL (Angle < -90)    -> A
+        // TR (Angle [-90, 0]) -> D  (CW 90)
+        // BR (Angle [0, 90])  -> C  (180)
+        // BL (Angle > 90)     -> B  (CCW 90)
 
         var ansIdx = 0;
-        if (angle < -90) ansIdx = 0; // A
-        else if (angle < 0) ansIdx = 1;   // B
-        else if (angle < 90) ansIdx = 2;  // C
-        else ansIdx = 3;                  // D
+        if (angle < -90) ansIdx = 0;      // A (TL)
+        else if (angle < 0) ansIdx = 3;   // D (TR)
+        else if (angle < 90) ansIdx = 2;  // C (BR)
+        else ansIdx = 1;                  // B (BL)
 
         // Telemetry for final debugging
         // dbg('Angle: ' + Math.round(angle) + ' -> ' + LETTERS[ansIdx]);
