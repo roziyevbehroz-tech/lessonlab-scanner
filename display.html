@@ -590,6 +590,11 @@
         </div>
     </div>
 
+    <!-- DEBUG CONSOLE -->
+    <div id="masterDebug"
+        style="position:fixed;bottom:10px;left:10px;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:10px;padding:10px;border-radius:5px;max-width:300px;max-height:200px;overflow-y:auto;z-index:9999;display:none;pointer-events:none;border:1px solid #333;">
+    </div>
+
     <!-- ═══════════════ LEADERBOARD ═══════════════ -->
     <div id="leaderboardScreen" class="hidden">
         <div class="lb-screen">
@@ -619,6 +624,25 @@
             var syncPeer = null;
             var scannerConn = null;
             var scannerConnected = false;
+
+            // ═══════════════════════════════════════
+            function log(msg) {
+                console.log('[DISPLAY]', msg);
+                var el = $('masterDebug');
+                if (el) {
+                    el.textContent = msg + '\n' + el.textContent.substring(0, 1000);
+                }
+            }
+
+            // 5-tap to show debug
+            var tapCount = 0;
+            document.addEventListener('click', function () {
+                tapCount++;
+                setTimeout(function () { tapCount = 0; }, 2000);
+                if (tapCount >= 5) {
+                    $('masterDebug').style.display = $('masterDebug').style.display === 'none' ? 'block' : 'none';
+                }
+            });
 
             function $(id) { return document.getElementById(id); }
 
@@ -659,37 +683,40 @@
                 if (typeof Peer === 'undefined') { console.log('No PeerJS'); return; }
 
                 var displayId = sessionId + '-display';
-                console.log('[DISPLAY] Creating peer: ' + displayId);
+                log('Creating peer: ' + displayId);
 
                 try {
                     syncPeer = new Peer(displayId, {
-                        debug: 0,
+                        debug: 3,
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
                                 { urls: 'stun:stun1.l.google.com:19302' },
+                                { urls: 'stun:stun2.l.google.com:19302' },
+                                { urls: 'stun:stun3.l.google.com:19302' },
+                                { urls: 'stun:stun4.l.google.com:19302' },
                                 { urls: 'stun:global.stun.twilio.com:3478' }
                             ]
                         }
                     });
                 } catch (e) {
-                    console.error('Peer err', e);
+                    log('Peer err: ' + e.message);
                     updateSyncBadge('off');
                     return;
                 }
 
                 syncPeer.on('open', function (id) {
-                    console.log('[DISPLAY] Peer open: ' + id);
+                    log('Peer open: ' + id);
                     updateSyncBadge('waiting');
                 });
 
                 syncPeer.on('connection', function (conn) {
-                    console.log('[DISPLAY] Scanner incoming!');
+                    log('Scanner incoming: ' + conn.peer);
                     scannerConn = conn;
 
                     conn.on('open', function () {
                         scannerConnected = true;
-                        console.log('[DISPLAY] Scanner CONNECTED!');
+                        log('Scanner CONNECTED!');
                         updateSyncBadge('connected');
                     });
 
@@ -699,17 +726,17 @@
 
                     conn.on('close', function () {
                         scannerConnected = false;
-                        console.log('[DISPLAY] Scanner disconnected');
+                        log('Scanner disconnected');
                         updateSyncBadge('waiting');
                     });
 
                     conn.on('error', function (err) {
-                        console.error('[DISPLAY] Conn err:', err);
+                        log('Conn err: ' + err);
                     });
                 });
 
                 syncPeer.on('error', function (err) {
-                    console.error('[DISPLAY] Peer err:', err.type, err);
+                    log('Peer error: ' + err.type);
                     if (err.type === 'unavailable-id') {
                         // ID taken — destroy and retry
                         syncPeer.destroy();
@@ -718,6 +745,7 @@
                 });
 
                 syncPeer.on('disconnected', function () {
+                    log('Peer disconnected');
                     updateSyncBadge('waiting');
                     try { syncPeer.reconnect(); } catch (e) { }
                 });
