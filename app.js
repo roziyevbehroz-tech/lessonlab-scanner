@@ -35,9 +35,56 @@
     // BLOCKING OVERLAY
     var overlay = document.createElement('div');
     overlay.id = 'connectOverlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;text-align:center;padding:20px;';
-    overlay.innerHTML = '<div style="font-size:40px;margin-bottom:20px;">🛰️</div><h2 style="margin:0 0 10px 0;">Display qidirilmoqda...</h2><p style="color:#aaa;font-size:14px;margin:0;">Iltimos, kuting. Telefonda internet borligini tekshiring.</p><div style="margin-top:20px;font-size:12px;color:#666;" id="connStep">Step 1: Init Peer</div>';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;text-align:center;padding:20px;';
+
+    // Manual Connect Input (hidden initially)
+    var manualInputHtml = '<div id="manualConnectBox" style="margin-top:20px;display:none;">' +
+        '<p style="font-size:14px;color:#ddd;margin-bottom:10px;">Ulanish qiyin bo\'lsa, kod kiriting:</p>' +
+        '<input type="text" id="manualCode" placeholder="Masalan: 5548" style="padding:10px;border-radius:5px;border:none;width:150px;text-align:center;font-size:16px;">' +
+        '<button id="btnManual" style="margin-left:10px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:5px;cursor:pointer;">Ulanish</button>' +
+        '</div>';
+
+    overlay.innerHTML = '<div style="font-size:50px;margin-bottom:20px;">📡</div>' +
+        '<h2 style="margin:0 0 10px 0;">Display qidirilmoqda...</h2>' +
+        '<p style="color:#aaa;font-size:14px;margin:0;">Iltimos, kuting.</p>' +
+        '<div style="margin-top:20px;font-size:12px;color:#666;" id="connStep">Step 1: Init Peer</div>' +
+        manualInputHtml;
+
     document.body.appendChild(overlay);
+
+    // Show manual input after 5 seconds if still stuck
+    setTimeout(function () {
+        var box = document.getElementById('manualConnectBox');
+        if (box) box.style.display = 'block';
+    }, 5000);
+
+    // Manual Connect Logic
+    document.getElementById('btnManual').addEventListener('click', function () {
+        var code = document.getElementById('manualCode').value.trim();
+        if (code.length < 3) return alert('Kod juda qisqa!');
+        // Assuming sessionId format: llab-{testId}-{code}
+        // We need to reconstruct the full display ID from just the code
+        // BUT we don't know testId if user enters just '5548'.
+        // So we assume the user is ALREADY on the correct page with correct testId.
+        // We just replace the random part of sessionId.
+        // Format: llab-25-5548
+
+        var parts = sessionId.split('-');
+        if (parts.length >= 3) {
+            // Replace last part with user code
+            parts[2] = code;
+            var newSessionId = parts.join('-');
+
+            // Re-init with new target
+            sessionId = newSessionId; // Update global
+            var targetDisplayId = newSessionId + '-display';
+
+            updateOverlay('Harakat: ' + code + ' bilan ulanish...');
+            connectToDisplay(targetDisplayId);
+        } else {
+            alert('Session ID formati noto\'g\'ri. Iltimos sahifani yangilang.');
+        }
+    });
 
     function updateOverlay(msg) {
         var el = document.getElementById('connStep');
@@ -106,13 +153,16 @@
             return;
         }
 
-        var scannerId = sessionId + '-scanner';
-        var displayId = sessionId + '-display';
+        // RANDOMIZED SCANNER ID TO PREVENT COLLISIONS
+        // Using timestamp + random suffix ensures every connection attempt is unique
+        var scannerId = sessionId + '-scanner-' + Math.floor(Math.random() * 1000000);
+
         dbg('Sync: creating peer ' + scannerId);
+        updateOverlay('Step 1: Init Peer (ID: ' + scannerId.split('-').pop() + ')');
 
         try {
             syncPeer = new Peer(scannerId, {
-                debug: 3,
+                debug: 2, // Moderate debug
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
@@ -125,23 +175,37 @@
                 }
             });
         } catch (e) {
-            dbg('Peer err: ' + e.message);
-            updateSyncUI('off');
+            dbg('Peer init err: ' + e.message);
+            showOverlay('Error: ' + e.message);
             return;
         }
 
         syncPeer.on('open', function (id) {
-            dbg('Sync: peer open ' + id);
-            updateSyncUI('connecting');
-            connectToDisplay(displayId);
+            dbg('Peer open: ' + id);
+            updateSyncUI('waiting');
+            // Auto-connect to display ONLY if we have session ID
+            if (sessionId) connectToDisplay(sessionId + '-display');
         });
 
+        function reconnectPeer() {
+            if (syncPeer && !syncPeer.destroyed) {
+                syncPeer.reconnect();
+            } else {
+                // If peer is destroyed, re-initialize it
+                initSync();
+            }
+        }
+
         syncPeer.on('error', function (err) {
-            dbg('Sync err: ' + err.type);
+            dbg('Peer ERROR: ' + err.type);
+            showOverlay('Error: ' + err.type + '. Retrying...');
+            // Fatal errors?
             if (err.type === 'peer-unavailable') {
-                // Display not ready — retry
-                updateSyncUI('waiting');
-                scheduleReconnect(displayId);
+                showOverlay('Display topilmadi. Qayta ulanish...');
+                setTimeout(function () { connectToDisplay(sessionId + '-display'); }, 2000);
+            } else if (err.type === 'network' || err.type === 'disconnected') {
+                showOverlay('Tarmoq xatosi. Qayta ulanish...');
+                setTimeout(reconnectPeer, 3000);
             } else if (err.type === 'unavailable-id') {
                 // Our ID taken — recreate
                 syncPeer.destroy();

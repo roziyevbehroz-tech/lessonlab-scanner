@@ -521,6 +521,22 @@
         <div class="welcome-card">
             <h1>📷 LLabQR</h1>
             <p class="subtitle">Sinfxona Skaneri — Master Display</p>
+            <div class="stat-box">
+                <i class="fas fa-users"></i>
+                <div>
+                    <div class="stat-value" id="totalStudents">-</div>
+                    <div class="stat-label">O'quvchilar</div>
+                </div>
+            </div>
+
+            <!-- SESSION CODE DISPLAY -->
+            <div class="stat-box" style="background:rgba(59, 130, 246, 0.2); border:1px solid rgba(59, 130, 246, 0.5);">
+                <i class="fas fa-key" style="color:#3b82f6;"></i>
+                <div>
+                    <div class="stat-value" id="sessionCodeDisplay" style="font-size:1.5rem; color:#fff;">...</div>
+                    <div class="stat-label" style="color:#3b82f6;">Ulanish kodi</div>
+                </div>
+            </div>
             <div class="info-grid">
                 <div class="info-item">
                     <div class="label">📝 Test</div>
@@ -1065,6 +1081,11 @@
             // INIT
             // ═══════════════════════════════════════
             loadTestData();
+            if (sessionId) {
+                var code = sessionId.split('-').pop();
+                $('sessionCodeDisplay').textContent = "Kod: " + code;
+            }
+
             initSync();
             console.log('[DISPLAY] Master v2 ready. Session: ' + sessionId);
 
