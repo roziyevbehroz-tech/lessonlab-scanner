@@ -639,6 +639,10 @@
                     lockedAnswers[mid] = ans;
                     var isOk = (ansIdx === correctIdx);
                     currentScanResults[mid] = { answer: ans, isCorrect: isOk, name: name };
+
+                    // SAVE IMMEDIATELY to Global buffer (Consistency Fix v12.3)
+                    allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+
                     refreshUI();
                     drawOverlay(ctx, m.corners, name, ans, isOk, true);
                     dbg((previousAns ? '↻ ' : '✓ ') + name + ' → ' + ans + (isOk ? ' ✓' : ' ✗'));
@@ -754,7 +758,9 @@
             if (mqttClient && mqttClient.connected && testData.chat_id) {
                 var mqttPayload = {
                     chat_id: testData.chat_id,
-                    results: allResults
+                    results: allResults,
+                    total_q: testData.questions.length, // Precision fix
+                    title: testData.title              // Context fix
                 };
                 mqttClient.publish('llab/results', JSON.stringify(mqttPayload), { qos: 0 });
                 if (statusEl) { statusEl.textContent = '✅ Botga yuborildi!'; statusEl.style.color = '#22c55e'; }
