@@ -355,13 +355,26 @@
     // ANSWER DETECTION — Plickers corner[0]
     // ════════════════════════════════════════
     function detectAnswer(corners) {
+        // Corners: 0:TL, 1:TR, 2:BR, 3:BL (relative to marker's orientation)
+        // ArUco detector sorts corners so corners[0] is the logical top-left of the pattern.
+        // We find the angle of corners[0] relative to marker center.
         var cx = (corners[0].x + corners[1].x + corners[2].x + corners[3].x) / 4;
         var cy = (corners[0].y + corners[1].y + corners[2].y + corners[3].y) / 4;
+
+        // Use atan2 to get the angle from center to corner[0]
         var angle = Math.atan2(corners[0].y - cy, corners[0].x - cx) * (180 / Math.PI);
-        if (angle >= -157.5 && angle < -67.5) return 0;
-        if (angle >= -67.5 && angle < 22.5) return 1;
-        if (angle >= 22.5 && angle < 112.5) return 2;
-        return 3;
+
+        // Plickers mapping:
+        // Top: -135deg (Approx) -> A
+        // Right: -45deg         -> B
+        // Bottom: 45deg          -> C
+        // Left: 135deg           -> D
+
+        // Normalize range [-180, 180]
+        if (angle < -115 && angle >= -180 || angle >= 155) return 0; // A (Top)
+        if (angle < -25 && angle >= -115) return 1;                  // B (Right)
+        if (angle < 65 && angle >= -25) return 2;                   // C (Bottom)
+        return 3;                                                   // D (Left)
     }
 
     function avgEdge(c) {
@@ -589,51 +602,60 @@
             if (edge < MIN_EDGE) continue;
             var name = studentName(mid);
 
-            if (lockedAnswers[mid] !== undefined) {
-                var lockAns = lockedAnswers[mid];
-                var lockOk = (LETTERS.indexOf(lockAns) === correctIdx);
-                drawOverlay(ctx, m.corners, name, lockAns, lockOk, true);
-                continue;
-            }
-
             var ansIdx = detectAnswer(m.corners);
             var ans = LETTERS[ansIdx];
 
+            // Answer Consistency Buffer
             if (!voteBuffers[mid]) voteBuffers[mid] = { answer: ans, count: 0 };
+
             if (voteBuffers[mid].answer === ans) {
                 voteBuffers[mid].count++;
             } else {
+                // Answer changed - restart buffer (hysteresis)
                 voteBuffers[mid] = { answer: ans, count: 1 };
             }
 
             var pct = Math.min(100, Math.round((voteBuffers[mid].count / VOTE_THRESHOLD) * 100));
 
+            // Logic: Lock answer if threshold reached
+            // If already locked, but detecting a different answer consistently, RE-LOCK.
             if (voteBuffers[mid].count >= VOTE_THRESHOLD) {
-                // LOCK
-                lockedAnswers[mid] = ans;
-                var isOk = (ansIdx === correctIdx);
-                currentScanResults[mid] = { answer: ans, isCorrect: isOk, name: name };
-                refreshUI();
-                drawOverlay(ctx, m.corners, name, ans, isOk, true);
-                dbg('✓ ' + name + ' → ' + ans + (isOk ? ' ✓' : ' ✗'));
+                var previousAns = lockedAnswers[mid];
 
-                // SYNC: send lock to display
-                syncSend({
-                    type: 'lock',
-                    mid: mid,
-                    answer: ans,
-                    isCorrect: isOk,
-                    name: name,
-                    q: currentQuestion
-                });
+                if (previousAns !== ans) {
+                    // LOCK / RE-LOCK
+                    lockedAnswers[mid] = ans;
+                    var isOk = (ansIdx === correctIdx);
+                    currentScanResults[mid] = { answer: ans, isCorrect: isOk, name: name };
+                    refreshUI();
+                    drawOverlay(ctx, m.corners, name, ans, isOk, true);
+                    dbg((previousAns ? '↻ ' : '✓ ') + name + ' → ' + ans + (isOk ? ' ✓' : ' ✗'));
 
-                try {
-                    if (tg && tg.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred(isOk ? 'success' : 'error');
-                    }
-                } catch (e) { }
+                    // SYNC: send lock/update to display
+                    syncSend({
+                        type: 'lock',
+                        mid: mid,
+                        answer: ans,
+                        isCorrect: isOk,
+                        name: name,
+                        q: currentQuestion
+                    });
+
+                    try {
+                        if (tg && tg.HapticFeedback) {
+                            tg.HapticFeedback.notificationOccurred(isOk ? 'success' : 'error');
+                        }
+                    } catch (e) { }
+                } else {
+                    // Constant detection of already locked answer
+                    drawOverlay(ctx, m.corners, name, ans, (ansIdx === correctIdx), true);
+                }
             } else {
-                drawOverlay(ctx, m.corners, name, ans + ' ' + pct + '%', null, false);
+                // Progressing towards lock/re-lock
+                var isCurrentlyLocked = (lockedAnswers[mid] !== undefined);
+                var overlayAns = isCurrentlyLocked ? (lockedAnswers[mid] + ' ➔ ' + ans) : ans;
+
+                drawOverlay(ctx, m.corners, name, overlayAns + ' ' + pct + '%', null, false);
 
                 // SYNC: send scan progress (throttled)
                 if (pct % 25 === 0 && pct > 0) {
