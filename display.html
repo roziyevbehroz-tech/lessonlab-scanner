@@ -694,7 +694,20 @@
             // ═══════════════════════════════════════
             // SYNC ENGINE (MQTT)
             // ═══════════════════════════════════════
+            // Global chat_id from loaded test data
+            var chatId = null;
+
             function initSync() {
+                if (typeof mqtt === 'undefined') {
+                    log('No MQTT lib, retrying...');
+                    setTimeout(initSync, 1000);
+                    return;
+                }
+
+                // Load chat_id if available
+                if (testData && testData.chat_id) chatId = testData.chat_id;
+
+                // Get code from session ID (llab-{test}-{code})
                 if (typeof mqtt === 'undefined') {
                     log('No MQTT lib, retrying...');
                     setTimeout(initSync, 1000);
@@ -748,7 +761,16 @@
                     } else if (topic.endsWith('/data')) {
                         try {
                             var data = JSON.parse(msgStr);
-                            handleScannerMessage(data);
+                            // Handle SYNC commands from Scanner (Slave -> Master control)
+                            if (data.type === 'goto') {
+                                log('Scanner req: goto ' + data.payload);
+                                showQuestion(data.payload);
+                            } else if (data.type === 'finish') {
+                                log('Scanner req: finish');
+                                showLeaderboard();
+                            } else {
+                                handleScannerMessage(data);
+                            }
                         } catch (e) { log('JSON err: ' + e); }
                     }
                 });
@@ -1040,17 +1062,23 @@
             // ═══════════════════════════════════════
             // SEND RESULTS — tell scanner to sendData
             // ═══════════════════════════════════════
-            $('sendResultsBtn').onclick = function () {
-                var statusEl = $('sendStatus');
+            $('sendResultsBtn').addEventListener('click', function () {
+                if (!allScanResults || Object.keys(allScanResults).length === 0) {
+                    alert("Hali natijalar yo'q!");
+                    return;
+                }
 
-                if (scannerConnected) {
-                    // Scanner will call tg.sendData()
-                    syncSend({ type: 'sendResults' });
-                    statusEl.textContent = '📤 Telefonga yuborildi — bot orqali guruhga ketadi...';
-                    statusEl.style.color = '#22c55e';
-                    this.disabled = true;
+                // Publish to MQTT for Python Bot
+                if (mqttClient && mqttClient.connected && chatId) {
+                    var payload = {
+                        chat_id: chatId,
+                        results: allScanResults
+                    };
+                    mqttClient.publish('llab/results', JSON.stringify(payload), { qos: 0 });
+                    $('sendStatus').textContent = "✅ Botga yuborildi!";
+                } else if (!chatId) {
+                    alert("Xatolik: Chat ID topilmadi. Botdan qayta kiring.");
                 } else {
-                    statusEl.textContent = '⚠️ Telefon ulanmagan. Skanerni oching.';
                     statusEl.style.color = '#f59e0b';
                 }
             };

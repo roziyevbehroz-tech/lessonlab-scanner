@@ -172,18 +172,21 @@
 
         mqttClient.on('message', function (topic, message) {
             var msgStr = message.toString();
-            // dbg('Msg: ' + msgStr);
 
             if (topic.endsWith('/command')) {
                 try {
                     var data = JSON.parse(msgStr);
+                    dbg('RX Command: ' + data.type);
                     handleDisplayMessage(data);
 
                     if (data.type === 'display-ready' || data.type === 'ack-ready') {
                         synced = true;
                         hideOverlay();
                         updateSyncUI('connected');
-                        applySyncMode();
+                        applySyncMode(); // Maybe don't disable buttons if we want 2-way sync?
+                        // Actually, let's ENABLE buttons so scanner can control too
+                        $('prev-question-btn').disabled = false;
+                        $('next-question-btn').disabled = false;
                     }
                 } catch (e) { dbg('JSON err: ' + e); }
             }
@@ -772,6 +775,50 @@
         }
     }
 
+    // Helper to show finish screen
+    function showFinishScreen() {
+        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+        running = false;
+        if (cameraStream) cameraStream.getTracks().forEach(function (t) { t.stop(); });
+        showLeaderboard();
+    }
+
+    // ════════════════════════════════════════
+    // CONTROLS
+    // ════════════════════════════════════════
+    $('prev-question-btn').addEventListener('click', function () {
+        if (currentQuestion > 0) {
+            var newIdx = currentQuestion - 1;
+            showQuestion(newIdx);
+            // Sync to display: Scanner -> Display
+            if (synced && syncCode) {
+                syncSend({ type: 'goto', payload: newIdx });
+            }
+        }
+    });
+
+    $('next-question-btn').addEventListener('click', function () {
+        if (currentQuestion < testData.questions.length - 1) {
+            var newIdx = currentQuestion + 1;
+            showQuestion(newIdx);
+            // Sync to display: Scanner -> Display
+            if (synced && syncCode) {
+                syncSend({ type: 'goto', payload: newIdx });
+            }
+        } else {
+            // Finish test locally?? Usually display finishes.
+            // But if user clicks finish on scanner:
+            showFinishScreen();
+        }
+    });
+
+    $('finish-test-btn').addEventListener('click', function () {
+        showFinishScreen();
+        if (synced && syncCode) {
+            syncSend({ type: 'finish' });
+        }
+    });
+
     // ════════════════════════════════════════
     // EVENT HANDLERS
     // ════════════════════════════════════════
@@ -783,34 +830,27 @@
         initSync();
     };
 
-    $('next-question-btn').onclick = function () {
-        if (synced) return; // Display controls when synced
-        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-        if (currentQuestion >= testData.questions.length - 1) {
-            showLeaderboard();
-        } else {
-            showQuestion(currentQuestion + 1);
-        }
+}
     };
 
-    $('prev-question-btn').onclick = function () {
-        if (synced) return;
-        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-        if (currentQuestion > 0) showQuestion(currentQuestion - 1);
-    };
+$('prev-question-btn').onclick = function () {
+    if (synced) return;
+    allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+    if (currentQuestion > 0) showQuestion(currentQuestion - 1);
+};
 
-    $('finish-test-btn').onclick = function () {
-        if (synced) return;
-        allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-        showLeaderboard();
-    };
+$('finish-test-btn').onclick = function () {
+    if (synced) return;
+    allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+    showLeaderboard();
+};
 
-    $('sendResultsBtn').onclick = sendResults;
+$('sendResultsBtn').onclick = sendResults;
 
-    // ════════════════════════════════════════
-    // INIT
-    // ════════════════════════════════════════
-    dbg('v9 SLAVE init');
-    loadTestData();
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+dbg('v9 SLAVE init');
+loadTestData();
 
-})();
+}) ();
