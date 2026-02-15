@@ -160,6 +160,13 @@
             // Publish STATUS
             publishStatus('scanner-ready');
 
+            // HEARTBEAT: Keep telling Display we are here (every 3s)
+            // This fixes the issue where Display misses the first message
+            if (window.pingInterval) clearInterval(window.pingInterval);
+            window.pingInterval = setInterval(function () {
+                publishStatus('scanner-ready');
+            }, 3000);
+
             // Allow manual access immediately if users just want to start
             // Force sync to true so we can send commands immediately
             synced = true;
