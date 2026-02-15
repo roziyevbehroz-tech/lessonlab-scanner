@@ -695,7 +695,11 @@
             // SYNC ENGINE (MQTT)
             // ═══════════════════════════════════════
             function initSync() {
-                if (typeof mqtt === 'undefined') { log('No MQTT lib'); return; }
+                if (typeof mqtt === 'undefined') {
+                    log('No MQTT lib, retrying...');
+                    setTimeout(initSync, 1000);
+                    return;
+                }
 
                 // Get code from session ID (llab-{test}-{code})
                 if (sessionId) {
