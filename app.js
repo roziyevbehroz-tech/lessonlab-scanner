@@ -830,27 +830,11 @@
         initSync();
     };
 
-}
-    };
+    // ════════════════════════════════════════
+    // INIT
+    // ════════════════════════════════════════
+    dbg('v11.2 SLAVE init');
+    loadTestData();
+    initSync();
 
-$('prev-question-btn').onclick = function () {
-    if (synced) return;
-    allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-    if (currentQuestion > 0) showQuestion(currentQuestion - 1);
-};
-
-$('finish-test-btn').onclick = function () {
-    if (synced) return;
-    allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
-    showLeaderboard();
-};
-
-$('sendResultsBtn').onclick = sendResults;
-
-// ════════════════════════════════════════
-// INIT
-// ════════════════════════════════════════
-dbg('v9 SLAVE init');
-loadTestData();
-
-}) ();
+})();
