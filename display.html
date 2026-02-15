@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLabQR — Quiz Display (Master)</title>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         /* ═══════════════════════════════════════
    DISPLAY MASTER — Premium Dark UI
@@ -637,9 +638,8 @@
             var currentQ = 0;
             var liveResults = {};          // {mid: {name, answer, isCorrect, locked, pct}}
             var allScanResults = {};       // {qIdx: {mid: {answer, isCorrect, name}}}
-            var syncPeer = null;
-            var scannerConn = null;
-            var scannerConnected = false;
+            var mqttClient = null;
+            var syncCode = "";
 
             // ═══════════════════════════════════════
             function log(msg) {
@@ -692,91 +692,86 @@
             }
 
             // ═══════════════════════════════════════
-            // PEERJS — MASTER (Display creates peer, waits)
+            // SYNC ENGINE (MQTT)
             // ═══════════════════════════════════════
             function initSync() {
-                if (!sessionId) { console.log('No session'); return; }
-                if (typeof Peer === 'undefined') { console.log('No PeerJS'); return; }
+                if (typeof mqtt === 'undefined') { log('No MQTT lib'); return; }
 
-                var displayId = sessionId + '-display';
-                log('Creating peer: ' + displayId);
-
-                try {
-                    syncPeer = new Peer(displayId, {
-                        debug: 3,
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' },
-                                { urls: 'stun:stun2.l.google.com:19302' },
-                                { urls: 'stun:stun3.l.google.com:19302' },
-                                { urls: 'stun:stun4.l.google.com:19302' },
-                                { urls: 'stun:global.stun.twilio.com:3478' }
-                            ]
-                        }
-                    });
-                } catch (e) {
-                    log('Peer err: ' + e.message);
-                    updateSyncBadge('off');
-                    return;
+                // Get code from session ID (llab-{test}-{code})
+                if (sessionId) {
+                    var parts = sessionId.split('-');
+                    syncCode = parts.length >= 3 ? parts[parts.length - 1] : sessionId;
+                } else {
+                    syncCode = Math.floor(Math.random() * 9000 + 1000).toString();
                 }
 
-                syncPeer.on('open', function (id) {
-                    log('Peer open: ' + id);
+                $('sessionCodeDisplay').textContent = "Kod: " + syncCode;
+
+                var clientId = 'llab_display_' + Math.random().toString(16).substr(2, 8);
+                var host = 'wss://broker.emqx.io:8084/mqtt';
+
+                log('Connecting to MQTT: ' + host);
+                updateSyncBadge('connecting');
+
+                mqttClient = mqtt.connect(host, {
+                    clientId: clientId,
+                    clean: true,
+                    connectTimeout: 4000
+                });
+
+                mqttClient.on('connect', function () {
+                    log('MQTT Connected! Topic: llab/sync/' + syncCode);
                     updateSyncBadge('waiting');
+
+                    // Subscribe to Scanner Data & Status
+                    mqttClient.subscribe('llab/sync/' + syncCode + '/data', { qos: 0 });
+                    mqttClient.subscribe('llab/sync/' + syncCode + '/status', { qos: 0 });
+
+                    // Announce we are ready
+                    publishCommand('display-ready');
                 });
 
-                syncPeer.on('connection', function (conn) {
-                    log('Scanner incoming: ' + conn.peer);
-                    scannerConn = conn;
+                mqttClient.on('message', function (topic, message) {
+                    var msgStr = message.toString();
+                    // log('Msg: ' + topic + ' -> ' + msgStr);
 
-                    conn.on('open', function () {
-                        scannerConnected = true;
-                        log('Scanner CONNECTED!');
-                        updateSyncBadge('connected');
-                    });
-
-                    conn.on('data', function (msg) {
-                        handleScannerMessage(msg);
-                    });
-
-                    conn.on('close', function () {
-                        scannerConnected = false;
-                        log('Scanner disconnected');
-                        updateSyncBadge('waiting');
-                    });
-
-                    conn.on('error', function (err) {
-                        log('Conn err: ' + err);
-                    });
-                });
-
-                syncPeer.on('error', function (err) {
-                    log('Peer error: ' + err.type);
-                    if (err.type === 'unavailable-id') {
-                        // ID taken — destroy and retry
-                        syncPeer.destroy();
-                        setTimeout(initSync, 2000);
+                    if (topic.endsWith('/status')) {
+                        if (msgStr === 'scanner-ready') {
+                            log('Scanner CONNECTED!');
+                            updateSyncBadge('connected');
+                            publishCommand('ack-ready'); // Acknowledge
+                        }
+                    } else if (topic.endsWith('/data')) {
+                        try {
+                            var data = JSON.parse(msgStr);
+                            handleScannerMessage(data);
+                        } catch (e) { log('JSON err: ' + e); }
                     }
                 });
 
-                syncPeer.on('disconnected', function () {
-                    log('Peer disconnected');
-                    updateSyncBadge('waiting');
-                    try { syncPeer.reconnect(); } catch (e) { }
+                mqttClient.on('error', function (err) {
+                    log('MQTT Error: ' + err.message);
+                    updateSyncBadge('off');
                 });
 
-                // Keepalive ping every 15s
-                setInterval(function () {
-                    if (scannerConn && scannerConn.open) {
-                        try { scannerConn.send({ type: 'ping' }); } catch (e) { }
-                    }
-                }, 15000);
+                mqttClient.on('offline', function () {
+                    log('MQTT Offline');
+                    updateSyncBadge('connecting');
+                });
             }
 
             function syncSend(data) {
-                if (scannerConn && scannerConn.open) {
-                    try { scannerConn.send(data); } catch (e) { }
+                // Not used for Display -> Scanner (we use publishCommand)
+            }
+
+            function sendCommand(cmd, payload) {
+                var msg = { type: cmd, payload: payload };
+                publishCommand(JSON.stringify(msg));
+            }
+
+            function publishCommand(msgStr) {
+                if (mqttClient && mqttClient.connected) {
+                    mqttClient.publish('llab/sync/' + syncCode + '/command', msgStr, { qos: 0 });
                 }
             }
 

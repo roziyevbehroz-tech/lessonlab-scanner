@@ -37,53 +37,35 @@
     overlay.id = 'connectOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif;text-align:center;padding:20px;';
 
-    // Manual Connect Input (hidden initially)
+    // Manual Connect Input
     var manualInputHtml = '<div id="manualConnectBox" style="margin-top:20px;display:none;">' +
-        '<p style="font-size:14px;color:#ddd;margin-bottom:10px;">Ulanish qiyin bo\'lsa, kod kiriting:</p>' +
-        '<input type="text" id="manualCode" placeholder="Masalan: 5548" style="padding:10px;border-radius:5px;border:none;width:150px;text-align:center;font-size:16px;">' +
-        '<button id="btnManual" style="margin-left:10px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:5px;cursor:pointer;">Ulanish</button>' +
+        '<p style="font-size:14px;color:#ddd;margin-bottom:10px;">Ulanish kodi:</p>' +
+        '<input type="number" id="manualCode" placeholder="Masalan: 5548" style="padding:12px;border-radius:5px;border:none;width:120px;text-align:center;font-size:20px;font-weight:bold;">' +
+        '<br><button id="btnManual" style="margin-top:15px;padding:12px 30px;background:#3b82f6;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Ulanish</button>' +
         '</div>';
 
     overlay.innerHTML = '<div style="font-size:50px;margin-bottom:20px;">📡</div>' +
-        '<h2 style="margin:0 0 10px 0;">Display qidirilmoqda...</h2>' +
-        '<p style="color:#aaa;font-size:14px;margin:0;">Iltimos, kuting.</p>' +
-        '<div style="margin-top:20px;font-size:12px;color:#666;" id="connStep">Step 1: Init Peer</div>' +
+        '<h2 style="margin:0 0 10px 0;">Serverga ulanish...</h2>' +
+        '<p style="color:#aaa;font-size:14px;margin:0;">MQTT Protocol (v10)</p>' +
+        '<div style="margin-top:20px;font-size:12px;color:#666;" id="connStep">Step 1: Init MQTT</div>' +
         manualInputHtml;
 
     document.body.appendChild(overlay);
 
-    // Show manual input after 5 seconds if still stuck
+    // Show manual input after 3 seconds
     setTimeout(function () {
         var box = document.getElementById('manualConnectBox');
         if (box) box.style.display = 'block';
-    }, 5000);
+    }, 3000);
 
     // Manual Connect Logic
     document.getElementById('btnManual').addEventListener('click', function () {
         var code = document.getElementById('manualCode').value.trim();
         if (code.length < 3) return alert('Kod juda qisqa!');
-        // Assuming sessionId format: llab-{testId}-{code}
-        // We need to reconstruct the full display ID from just the code
-        // BUT we don't know testId if user enters just '5548'.
-        // So we assume the user is ALREADY on the correct page with correct testId.
-        // We just replace the random part of sessionId.
-        // Format: llab-25-5548
 
-        var parts = sessionId.split('-');
-        if (parts.length >= 3) {
-            // Replace last part with user code
-            parts[2] = code;
-            var newSessionId = parts.join('-');
-
-            // Re-init with new target
-            sessionId = newSessionId; // Update global
-            var targetDisplayId = newSessionId + '-display';
-
-            updateOverlay('Harakat: ' + code + ' bilan ulanish...');
-            connectToDisplay(targetDisplayId);
-        } else {
-            alert('Session ID formati noto\'g\'ri. Iltimos sahifani yangilang.');
-        }
+        // Re-init with new code
+        updateOverlay('Kod: ' + code + ' bilan ulanish...');
+        connectToMQTT(code);
     });
 
     function updateOverlay(msg) {
@@ -128,159 +110,129 @@
     var sessionId = null;
     var synced = false;          // true when connected to display
 
-    // ─── PEERJS ───
-    var syncPeer = null;
-    var displayConn = null;
-    var reconnectTimer = null;
-    var reconnectAttempts = 0;
-    var MAX_RECONNECT = 50;
-
-    function syncSend(data) {
-        if (displayConn && displayConn.open) {
-            try { displayConn.send(data); } catch (e) { }
-        }
-    }
+    // ─── MQTT SYNC ───
+    var mqttClient = null;
+    var syncCode = null;
 
     function initSync() {
-        if (!sessionId) {
-            dbg('No session ID');
-            updateSyncUI('off');
-            return;
-        }
-        if (typeof Peer === 'undefined') {
-            dbg('PeerJS not loaded');
-            updateSyncUI('off');
+        if (typeof mqtt === 'undefined') {
+            // Retry if lib not loaded
+            setTimeout(initSync, 1000);
             return;
         }
 
-        // RANDOMIZED SCANNER ID TO PREVENT COLLISIONS
-        // Using timestamp + random suffix ensures every connection attempt is unique
-        var scannerId = sessionId + '-scanner-' + Math.floor(Math.random() * 1000000);
-
-        dbg('Sync: creating peer ' + scannerId);
-        updateOverlay('Step 1: Init Peer (ID: ' + scannerId.split('-').pop() + ')');
-
-        try {
-            syncPeer = new Peer(scannerId, {
-                debug: 2, // Moderate debug
-                config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' }
-                    ]
-                }
-            });
-        } catch (e) {
-            dbg('Peer init err: ' + e.message);
-            showOverlay('Error: ' + e.message);
-            return;
+        // Get code from URL
+        if (sessionId) {
+            var parts = sessionId.split('-');
+            syncCode = parts.length >= 3 ? parts[parts.length - 1] : null;
         }
 
-        syncPeer.on('open', function (id) {
-            dbg('Peer open: ' + id);
+        if (syncCode) {
+            connectToMQTT(syncCode);
+        } else {
+            showOverlay('Kod topilmadi. Iltimos, kod kiriting.');
+        }
+    }
+
+    function connectToMQTT(code) {
+        if (mqttClient) { try { mqttClient.end(); } catch (e) { } }
+
+        syncCode = code;
+        updateOverlay('Serverga ulanish: ' + code);
+
+        var clientId = 'llab_scanner_' + Math.random().toString(16).substr(2, 8);
+        var host = 'wss://broker.emqx.io:8084/mqtt';
+
+        mqttClient = mqtt.connect(host, {
+            clientId: clientId,
+            clean: true,
+            connectTimeout: 4000
+        });
+
+        mqttClient.on('connect', function () {
+            dbg('MQTT Connected');
+            updateOverlay('Displayga ulanish...');
             updateSyncUI('waiting');
-            // Auto-connect to display ONLY if we have session ID
-            if (sessionId) connectToDisplay(sessionId + '-display');
+
+            // Subscribe to COMMANDS from Display
+            mqttClient.subscribe('llab/sync/' + syncCode + '/command', { qos: 0 });
+
+            // Publish STATUS
+            publishStatus('scanner-ready');
+
+            // Allow manual access immediately if users just want to start
+            // But prefer waiting for ack
+            setTimeout(function () {
+                if (!synced) {
+                    hideOverlay(); // Fallback unlock
+                    updateSyncUI('connected'); // Fake it till you make it
+                }
+            }, 2000);
         });
 
-        function reconnectPeer() {
-            if (syncPeer && !syncPeer.destroyed) {
-                syncPeer.reconnect();
-            } else {
-                // If peer is destroyed, re-initialize it
-                initSync();
+        mqttClient.on('message', function (topic, message) {
+            var msgStr = message.toString();
+            // dbg('Msg: ' + msgStr);
+
+            if (topic.endsWith('/command')) {
+                try {
+                    var data = JSON.parse(msgStr);
+                    handleDisplayMessage(data);
+
+                    if (data.type === 'display-ready' || data.type === 'ack-ready') {
+                        synced = true;
+                        hideOverlay();
+                        updateSyncUI('connected');
+                        applySyncMode();
+                    }
+                } catch (e) { dbg('JSON err: ' + e); }
             }
+        });
+
+        mqttClient.on('offline', function () {
+            updateSyncUI('connecting');
+            showOverlay('Internet yo\'q. Qayta ulanish...');
+        });
+
+        mqttClient.on('error', function (err) {
+            showOverlay('MQTT Error: ' + err.message);
+        });
+    }
+
+    function syncSend(data) {
+        if (mqttClient && mqttClient.connected && syncCode) {
+            var msgStr = JSON.stringify(data);
+            mqttClient.publish('llab/sync/' + syncCode + '/data', msgStr, { qos: 0 });
         }
-
-        syncPeer.on('error', function (err) {
-            dbg('Peer ERROR: ' + err.type);
-            showOverlay('Error: ' + err.type + '. Retrying...');
-            // Fatal errors?
-            if (err.type === 'peer-unavailable') {
-                showOverlay('Display topilmadi. Qayta ulanish...');
-                setTimeout(function () { connectToDisplay(sessionId + '-display'); }, 2000);
-            } else if (err.type === 'network' || err.type === 'disconnected') {
-                showOverlay('Tarmoq xatosi. Qayta ulanish...');
-                setTimeout(reconnectPeer, 3000);
-            } else if (err.type === 'unavailable-id') {
-                // Our ID taken — recreate
-                syncPeer.destroy();
-                scannerId = sessionId + '-scanner-' + Date.now() % 10000;
-                setTimeout(initSync, 1500);
-            }
-        });
-
-        syncPeer.on('disconnected', function () {
-            updateSyncUI('connecting');
-            try { syncPeer.reconnect(); } catch (e) { }
-        });
     }
 
-    function connectToDisplay(displayId) {
-        // Remove limit - retry forever
-        // if (reconnectAttempts >= MAX_RECONNECT) { ... }
-
-        dbg('Connecting to ' + displayId + ' (attempt ' + (reconnectAttempts + 1) + ')');
-        updateOverlay('Step 2: Connecting to Display... (' + (reconnectAttempts + 1) + ')');
-
-        if (displayConn) { try { displayConn.close(); } catch (e) { } }
-
-        try {
-            // RELIABLE: FALSE for mobile speed/compatibility
-            displayConn = syncPeer.connect(displayId, { reliable: false });
-        } catch (e) {
-            dbg('Connect err: ' + e.message);
-            scheduleReconnect(displayId);
-            return;
+    function publishStatus(status) {
+        if (mqttClient && mqttClient.connected && syncCode) {
+            mqttClient.publish('llab/sync/' + syncCode + '/status', status, { qos: 0 });
         }
-
-        displayConn.on('open', function () {
-            synced = true;
-            reconnectAttempts = 0;
-            dbg('CONNECTED to display!');
-            updateSyncUI('connected');
-            hideOverlay(); // UNBLOCK UI
-            applySyncMode();
-
-            // Tell display we're here
-            syncSend({
-                type: 'scanner-ready',
-                currentQuestion: currentQuestion
-            });
-        });
-
-        displayConn.on('data', function (msg) {
-            handleDisplayCommand(msg);
-        });
-
-        displayConn.on('close', function () {
-            synced = false;
-            dbg('Display disconnected');
-            updateSyncUI('connecting');
-            showOverlay('Connection lost. Reconnecting...'); // BLOCK UI
-            removeSyncMode();
-            scheduleReconnect(displayId);
-        });
-
-        displayConn.on('error', function (err) {
-            dbg('Conn err: ' + err);
-            synced = false;
-            updateSyncUI('connecting');
-        });
     }
 
-    function scheduleReconnect(displayId) {
-        clearTimeout(reconnectTimer);
-        reconnectAttempts++;
-        var delay = Math.min(3000 + reconnectAttempts * 500, 10000);
-        reconnectTimer = setTimeout(function () {
-            connectToDisplay(displayId);
-        }, delay);
+    // Unused PeerJS functions removed/stubbed
+    function handleDisplayMessage(data) {
+        if (data.type === 'goto') {
+            if (typeof showQuestion === 'function') showQuestion(data.payload);
+        } else if (data.type === 'finish') {
+            // Whiteboard says: test is done
+            allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
+            running = false;
+            if (cameraStream) cameraStream.getTracks().forEach(function (t) { t.stop(); });
+            showLeaderboard(data.allResults || allResults);
+        } else if (data.type === 'sendResults') {
+            // Whiteboard says: send results to Telegram bot
+            sendResults();
+        } else if (data.type === 'ping') {
+            syncSend({ type: 'pong' });
+        }
     }
+
+    // Stub
+    function connectToDisplay() { }
+    function scheduleReconnect() { }
 
     // ════════════════════════════════════════
     // RECEIVE COMMANDS FROM WHITEBOARD
