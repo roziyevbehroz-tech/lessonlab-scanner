@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLabQR — Quiz Display (Master)</title>
+    <title>L-Lab Vision Display</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
@@ -520,8 +520,8 @@
     <!-- ═══════════════ WELCOME SCREEN ═══════════════ -->
     <div id="welcomeScreen" class="screen">
         <div class="welcome-card">
-            <h1>📷 LLabQR</h1>
-            <p class="subtitle">Sinfxona Skaneri — Master Display</p>
+            <h1>✨ L-Lab Vision</h1>
+            <p class="subtitle">Premium Skaner — Master Display</p>
             <div class="stat-box">
                 <i class="fas fa-users"></i>
                 <div>
@@ -689,7 +689,7 @@
                     if ($('wCount')) $('wCount').textContent = testData.questions.length + ' ta';
                     if ($('wClass')) $('wClass').textContent = testData.class_name || '—';
                     if ($('wStudents')) $('wStudents').textContent = testData.students.length > 0 ? testData.students.length + ' ta' : '—';
-                    document.title = 'LLabQR — ' + testData.title;
+                    document.title = 'L-Lab Vision — ' + testData.title;
                 }
             }
 
