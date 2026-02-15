@@ -827,6 +827,15 @@
         allResults[currentQuestion] = JSON.parse(JSON.stringify(currentScanResults));
         running = false;
         if (cameraStream) cameraStream.getTracks().forEach(function (t) { t.stop(); });
+
+        // Sync final state to Display (v12.4 Consistency Fix)
+        if (synced && syncCode) {
+            syncSend({
+                type: 'finish',
+                allResults: allResults
+            });
+        }
+
         showLeaderboard();
     }
 

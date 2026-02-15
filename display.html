@@ -763,6 +763,10 @@
                                 showQuestion(data.payload);
                             } else if (data.type === 'finish') {
                                 log('Scanner req: finish');
+                                if (data.allResults) {
+                                    // Full State Sync (v12.4 Consistency Fix)
+                                    allScanResults = JSON.parse(JSON.stringify(data.allResults));
+                                }
                                 showLeaderboard();
                             } else {
                                 handleScannerMessage(data);
