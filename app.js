@@ -364,17 +364,16 @@
         // Use atan2 to get the angle from center to corner[0]
         var angle = Math.atan2(corners[0].y - cy, corners[0].x - cx) * (180 / Math.PI);
 
-        // Plickers mapping:
-        // Top: -135deg (Approx) -> A
-        // Right: -45deg         -> B
-        // Bottom: 45deg          -> C
-        // Left: 135deg           -> D
+        // Plickers mapping (Corrected v11.9):
+        // A (Upright): Corner 0 at TL -> Angle [-180, -90]
+        // B (CCW 90):  Corner 0 at BL -> Angle [90, 180]
+        // C (180 Rotation): Corner 0 at BR -> Angle [0, 90]
+        // D (CW 90):   Corner 0 at TR -> Angle [-90, 0]
 
-        // Normalize range [-180, 180]
-        if (angle < -115 && angle >= -180 || angle >= 155) return 0; // A (Top)
-        if (angle < -25 && angle >= -115) return 1;                  // B (Right)
-        if (angle < 65 && angle >= -25) return 2;                   // C (Bottom)
-        return 3;                                                   // D (Left)
+        if (angle < -90) return 0; // A
+        if (angle < 0) return 3;   // D
+        if (angle < 90) return 2;  // C
+        return 1;                  // B
     }
 
     function avgEdge(c) {
@@ -472,7 +471,14 @@
         ctx.fillStyle = color;
         for (var k = 0; k < 4; k++) {
             ctx.beginPath();
-            ctx.arc(corners[k].x, corners[k].y, k === 0 ? 5 : 3, 0, Math.PI * 2);
+            // Corner 0 is our orientation anchor - make it stand out (Cyan)
+            if (k === 0) {
+                ctx.fillStyle = '#00ffff';
+                ctx.arc(corners[k].x, corners[k].y, 6, 0, Math.PI * 2);
+            } else {
+                ctx.fillStyle = color;
+                ctx.arc(corners[k].x, corners[k].y, 3, 0, Math.PI * 2);
+            }
             ctx.fill();
         }
 
