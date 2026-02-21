@@ -460,8 +460,8 @@
     // ════════════════════════════════════════
     // DRAW OVERLAY
     // ════════════════════════════════════════
-    function drawOverlay(ctx, corners, name, text, isCorrect, locked) {
-        var color = locked ? (isCorrect ? '#00ff44' : '#ff3344') : '#ffaa00';
+    function drawOverlay(ctx, corners, name, text, isCorrect, locked, overrideColor) {
+        var color = overrideColor || (locked ? (isCorrect ? '#00ff44' : '#ff3344') : '#ffaa00');
         ctx.strokeStyle = color;
         ctx.lineWidth = locked ? 4 : 2;
         ctx.beginPath();
@@ -648,6 +648,14 @@
             var name = studentName(mid);
 
             var ansIdx = detectAnswer(m.corners);
+
+            // v14.0 — Smart Choice Filtering
+            if (ansIdx >= q.options.length) {
+                // Display warning but do NOT lock/vote
+                drawOverlay(ctx, m.corners, name, "Mavjud emas ⚠️", null, false, '#ffcc00');
+                continue;
+            }
+
             var ans = LETTERS[ansIdx];
 
             // Answer Consistency Buffer
