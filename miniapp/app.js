@@ -64,24 +64,24 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadDashboardStats() {
     try {
         // Test count
-        const { count: testCount } = await supabase.from('bot_tests').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
+        const { count: testCount } = await supabaseClient.from('bot_tests').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
         document.getElementById('dash-test-count').innerText = testCount || 0;
 
         // Dict count
-        const { count: dictCount } = await supabase.from('bot_dictionaries').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
+        const { count: dictCount } = await supabaseClient.from('bot_dictionaries').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
         document.getElementById('dash-dict-count').innerText = dictCount || 0;
 
         // Class count
-        const { count: classCount } = await supabase.from('bot_classes').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
+        const { count: classCount } = await supabaseClient.from('bot_classes').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
         document.getElementById('dash-class-count').innerText = classCount || 0;
 
         // Student count
         // Fetch all classes first
-        const { data: classes } = await supabase.from('bot_classes').select('id').eq('user_id', currentUserId);
+        const { data: classes } = await supabaseClient.from('bot_classes').select('id').eq('user_id', currentUserId);
         let studentCount = 0;
         if (classes && classes.length > 0) {
             const classIds = classes.map(c => c.id);
-            const { count: sCount } = await supabase.from('bot_students').select('*', { count: 'exact', head: true }).in('class_id', classIds);
+            const { count: sCount } = await supabaseClient.from('bot_students').select('*', { count: 'exact', head: true }).in('class_id', classIds);
             studentCount = sCount || 0;
         }
         document.getElementById('dash-student-count').innerText = studentCount;
@@ -115,7 +115,7 @@ async function loadDictionaries() {
             html += `<li>
                           <span>📕 ${dict.name}</span>
                           <div>
-                              <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="alert('Tez kunda...')"><i class="fa-solid fa-gear"></i></button>
+                              <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="openDictDetailView(${dict.id}, '${dict.name}')"><i class="fa-solid fa-gear"></i></button>
                               <button class="btn-sm" style="background:var(--button-color); color:white" onclick="openActionModal(${dict.id}, 'dict')"><i class="fa-solid fa-play"></i></button>
                           </div>
                      </li>`;
@@ -125,7 +125,7 @@ async function loadDictionaries() {
 
     } catch (err) {
         console.error("Lug'atlarni yuklashda xato:", err);
-        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Lug'atlarni yuklashda xatolik yuz berdi.</p>`;
+        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
     }
 }
 
@@ -153,7 +153,7 @@ async function loadTests() {
             html += `<li>
                                             <span>📄 ${test.title}</span>
                                             <div>
-                                                <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="alert('Tez kunda...')"><i class="fa-solid fa-gear"></i></button>
+                                                <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="openTestDetailView(${test.id}, '${test.title.replace(/'/g, "\\'")}')"><i class="fa-solid fa-gear"></i></button>
                                                 <button class="btn-sm" style="background:var(--button-color); color:white" onclick="openActionModal(${test.id}, 'test')"><i class="fa-solid fa-play"></i></button>
                                             </div>
                                        </li>`;
@@ -163,7 +163,7 @@ async function loadTests() {
 
     } catch (err) {
         console.error("Testlarni yuklashda xato:", err);
-        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Testlarni yuklashda xatolik yuz berdi.</p>`;
+        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
     }
 }
 
@@ -454,7 +454,7 @@ async function submitCreateItem() {
             insertData.name = title;
         }
 
-        const { error } = await supabase.from(tableName).insert([insertData]);
+        const { error } = await supabaseClient.from(tableName).insert([insertData]);
 
         if (error) throw error;
 
@@ -475,7 +475,7 @@ async function submitCreateItem() {
 
     } catch (err) {
         console.error("Yaratishda xato:", err);
-        Swal.fire('Xatolik', 'Saqlash imkonsiz', 'error');
+        Swal.fire('Xatolik', err.message || 'Saqlash imkonsiz', 'error');
     }
 }
 
@@ -518,5 +518,279 @@ function startAction(actionType) {
     } else {
         // Fallback for standalone web view testing
         Swal.fire('Harakat Tanlandi', `Botga yuboriladigan buyruq: ${payload}`, 'info');
+    }
+}
+
+// ==========================================
+// TEST DETAILS & QUESTIONS LOGIC
+// ==========================================
+let currentTestId = null;
+
+async function openTestDetailView(testId, testTitle) {
+    currentTestId = testId;
+    document.getElementById('tests-list').parentElement.style.display = 'none';
+    document.getElementById('dicts-card').style.display = 'none';
+
+    document.getElementById('test-detail-title').innerText = testTitle;
+    document.getElementById('test-detail-view').style.display = 'block';
+
+    await loadQuestions(testId);
+}
+
+function closeTestDetailView() {
+    currentTestId = null;
+    document.getElementById('test-detail-view').style.display = 'none';
+    document.getElementById('tests-list').parentElement.style.display = 'block';
+    document.getElementById('dicts-card').style.display = 'block';
+}
+
+async function loadQuestions(testId) {
+    const listEl = document.getElementById('test-questions-list');
+    listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Savollar yuklanmoqda...</p>';
+
+    try {
+        // Fetch questions
+        const { data: questions, error: qError } = await supabase
+            .from('bot_questions')
+            .select('*')
+            .eq('test_id', testId)
+            .order('id', { ascending: true });
+
+        if (qError) throw qError;
+
+        if (!questions || questions.length === 0) {
+            listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Bu testda hali savollar yo\'q.</p>';
+            return;
+        }
+
+        // Fetch options for these questions
+        const qIds = questions.map(q => q.id);
+        const { data: options, error: optError } = await supabase
+            .from('bot_options')
+            .select('*')
+            .in('question_id', qIds);
+
+        if (optError) throw optError;
+
+        let html = '<ul class="item-list">';
+        questions.forEach((q, index) => {
+            const qOpts = options.filter(o => o.question_id === q.id).sort((a, b) => a.id - b.id);
+            let optsHtml = '<div style="display:flex; flex-direction:column; gap:4px; margin-top:8px; font-size:13px; color:var(--hint-color);">';
+
+            qOpts.forEach((opt, i) => {
+                const label = ['A', 'B', 'C', 'D'][i] || '?';
+                const style = opt.is_correct ? 'color:#10b981; font-weight:bold;' : '';
+                optsHtml += `<span style="${style}">${label}) ${opt.text} ${opt.is_correct ? '✓' : ''}</span>`;
+            });
+            optsHtml += '</div>';
+
+            html += `<li>
+                        <div style="flex:1;">
+                            <span style="font-weight:bold; color:var(--text-color);">${index + 1}. ${q.text}</span>
+                            ${optsHtml}
+                        </div>
+                     </li>`;
+        });
+        html += '</ul>';
+        listEl.innerHTML = html;
+
+    } catch (err) {
+        console.error("Savollarni yuklashda xato:", err);
+        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik yuz berdi.</p>`;
+    }
+}
+
+function openAddQuestionModal() {
+    document.getElementById('question-text').value = '';
+    document.getElementById('opt-a-text').value = '';
+    document.getElementById('opt-b-text').value = '';
+    document.getElementById('opt-c-text').value = '';
+    document.getElementById('opt-d-text').value = '';
+    document.getElementById('opt-a-radio').checked = true;
+
+    const modal = document.getElementById('add-question-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => modal.style.opacity = '1', 10);
+}
+
+function closeAddQuestionModal() {
+    const modal = document.getElementById('add-question-modal');
+    modal.style.opacity = '0';
+    setTimeout(() => modal.style.display = 'none', 300);
+}
+
+async function submitQuestion() {
+    if (!currentTestId) return;
+
+    const text = document.getElementById('question-text').value.trim();
+    const optA = document.getElementById('opt-a-text').value.trim();
+    const optB = document.getElementById('opt-b-text').value.trim();
+    const optC = document.getElementById('opt-c-text').value.trim();
+    const optD = document.getElementById('opt-d-text').value.trim();
+    const correctVal = document.querySelector('input[name="correct-option"]:checked').value; // A, B, C, D
+
+    if (!text || !optA || !optB) {
+        Swal.fire('Diqqat', 'Savol matni va kamida A va B variantlar kiritilishi shart', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnSaveQuestion');
+    btn.disabled = true;
+    btn.innerHTML = 'Saqlanmoqda...';
+
+    try {
+        // 1. Insert Question
+        const { data: qData, error: qErr } = await supabase
+            .from('bot_questions')
+            .insert([{ test_id: currentTestId, text: text, hint: '' }])
+            .select()
+            .single();
+
+        if (qErr) throw qErr;
+        const newQId = qData.id;
+
+        // 2. Insert Options
+        let optionsToInsert = [
+            { question_id: newQId, text: optA, is_correct: correctVal === 'A' },
+            { question_id: newQId, text: optB, is_correct: correctVal === 'B' }
+        ];
+        if (optC) optionsToInsert.push({ question_id: newQId, text: optC, is_correct: correctVal === 'C' });
+        if (optD) optionsToInsert.push({ question_id: newQId, text: optD, is_correct: correctVal === 'D' });
+
+        const { error: optErr } = await supabaseClient.from('bot_options').insert(optionsToInsert);
+        if (optErr) throw optErr;
+
+        Swal.fire({ title: 'Saqlandi!', icon: 'success', timer: 1000, showConfirmButton: false });
+        closeAddQuestionModal();
+        loadQuestions(currentTestId);
+
+    } catch (err) {
+        console.error("Savol saqlashda xato:", err);
+        Swal.fire('Xatolik', err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Saqlash';
+    }
+}
+
+// ==========================================
+// DICTIONARY DETAILS & WORDS LOGIC
+// ==========================================
+let currentDictId = null;
+
+async function openDictDetailView(dictId, dictName) {
+    currentDictId = dictId;
+    document.getElementById('dicts-card').style.display = 'none';
+    document.getElementById('tests-list').parentElement.style.display = 'none'; // hide tests card
+
+    document.getElementById('dict-detail-title').innerText = dictName;
+    document.getElementById('dict-detail-view').style.display = 'block';
+
+    await loadWords(dictId);
+}
+
+function closeDictDetailView() {
+    currentDictId = null;
+    document.getElementById('dict-detail-view').style.display = 'none';
+    document.getElementById('tests-list').parentElement.style.display = 'block';
+    document.getElementById('dicts-card').style.display = 'block';
+}
+
+async function loadWords(dictId) {
+    const listEl = document.getElementById('dict-words-list');
+    listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">So\'zlar yuklanmoqda...</p>';
+
+    try {
+        const { data, error } = await supabase
+            .from('bot_dictionary_words')
+            .select('*')
+            .eq('dictionary_id', dictId)
+            .order('id', { ascending: true });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Bu lug\'atda hali so\'zlar yo\'q.</p>';
+            return;
+        }
+
+        let html = '<ul class="item-list">';
+        data.forEach((w, index) => {
+            html += `<li>
+                        <div style="flex:1; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:bold; color:var(--text-color);">${w.word}</span>
+                            <span style="color:var(--button-color); font-size:14px;">${w.translation}</span>
+                        </div>
+                     </li>`;
+        });
+        html += '</ul>';
+        listEl.innerHTML = html;
+
+    } catch (err) {
+        console.error("So'zlarni yuklashda xato:", err);
+        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik yuz berdi.</p>`;
+    }
+}
+
+function openAddWordModal() {
+    document.getElementById('word-term').value = '';
+    document.getElementById('word-translation').value = '';
+
+    const modal = document.getElementById('add-word-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => modal.style.opacity = '1', 10);
+}
+
+function closeAddWordModal() {
+    const modal = document.getElementById('add-word-modal');
+    modal.style.opacity = '0';
+    setTimeout(() => modal.style.display = 'none', 300);
+}
+
+async function submitWord() {
+    if (!currentDictId) return;
+
+    const word = document.getElementById('word-term').value.trim();
+    const translation = document.getElementById('word-translation').value.trim();
+
+    if (!word || !translation) {
+        Swal.fire('Diqqat', 'Ikkala maydonni ham to\'ldiring', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnSaveWord');
+    btn.disabled = true;
+    btn.innerHTML = 'Saqlanmoqda...';
+
+    try {
+        const { error } = await supabase
+            .from('bot_dictionary_words')
+            .insert([{ dictionary_id: currentDictId, word: word, translation: translation }]);
+
+        if (error) throw error;
+
+        // Kichik, xalaqit bermaydigan notification
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500,
+            timerProgressBar: true
+        });
+        Toast.fire({ icon: 'success', title: 'Qo\'shildi' });
+
+        // Modalni ochiq qoldirib, faqat inputlarni tozalash qulayroq (ko'p so'z qo'shish uchun)
+        document.getElementById('word-term').value = '';
+        document.getElementById('word-translation').value = '';
+        document.getElementById('word-term').focus();
+
+        loadWords(currentDictId); // Refresh list in background
+
+    } catch (err) {
+        console.error("So'z saqlashda xato:", err);
+        Swal.fire('Xatolik', err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Saqlash';
     }
 }

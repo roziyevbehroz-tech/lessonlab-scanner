@@ -78,7 +78,7 @@
                                         </div>
                               </div>
 
-                              <div class="card" style="margin-top: 15px;">
+                              <div class="card" id="dicts-card" style="margin-top: 15px;">
                                         <div
                                                   style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                                   <h3>Sizning Lug'atlaringiz</h3>
@@ -91,6 +91,52 @@
                                                   <p
                                                             style="color:var(--hint-color); font-size: 13px; text-align: center;">
                                                             Lug'atlar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+
+                              <!-- Test Detail View (Hidden by default) -->
+                              <div class="card" id="test-detail-view" style="display: none;">
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                  <h3 id="test-detail-title">Test Nomi</h3>
+                                                  <button class="btn-sm" onclick="closeTestDetailView()">⬅️
+                                                            Orqaga</button>
+                                        </div>
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                                  <p style="font-size: 13px; color: var(--hint-color); margin: 0;">
+                                                            Savollar ro'yxati:</p>
+                                                  <button class="btn-sm" style="background:#10b981; color:white;"
+                                                            onclick="openAddQuestionModal()"><i
+                                                                      class="fa-solid fa-plus"></i> Savol</button>
+                                        </div>
+                                        <div id="test-questions-list">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            Savollar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+
+                              <!-- Dictionary Detail View (Hidden by default) -->
+                              <div class="card" id="dict-detail-view" style="display: none;">
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                  <h3 id="dict-detail-title">Lug'at Nomi</h3>
+                                                  <button class="btn-sm" onclick="closeDictDetailView()">⬅️
+                                                            Orqaga</button>
+                                        </div>
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                                  <p style="font-size: 13px; color: var(--hint-color); margin: 0;">
+                                                            So'zlar ro'yxati:</p>
+                                                  <button class="btn-sm" style="background:#10b981; color:white;"
+                                                            onclick="openAddWordModal()"><i
+                                                                      class="fa-solid fa-plus"></i> So'z</button>
+                                        </div>
+                                        <div id="dict-words-list">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            So'zlar yuklanmoqda...</p>
                                         </div>
                               </div>
                     </section>
@@ -246,6 +292,87 @@
                                                             style="color:var(--hint-color); font-size:12px;"></i>
                                         </li>
                               </ul>
+                    </div>
+          </div>
+
+          <!-- Yozma Savol Qo'shish Modali -->
+          <div id="add-question-modal"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center; opacity:0; transition: opacity 0.3s; padding:20px;">
+                    <div class="modal-content-animated"
+                              style="background:var(--card-bg); padding:20px; border-radius:16px; width:100%; max-width:400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+                              <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                        <h3 style="margin:0; color:var(--text-color);">Yangi Savol</h3>
+                                        <button onclick="closeAddQuestionModal()"
+                                                  style="background:none; border:none; font-size:20px; color:var(--hint-color); cursor:pointer;"><i
+                                                            class="fa-solid fa-xmark"></i></button>
+                              </div>
+                              <textarea id="question-text" placeholder="Savol matnini kiriting..."
+                                        style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:15px; font-size:14px; background:var(--bg-color); color:var(--text-color); outline:none; font-family:inherit; resize:vertical; min-height:80px;"></textarea>
+
+                              <p
+                                        style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: var(--hint-color);">
+                                        Variantlar (Kamida 2 ta yozing, to'g'risini belgilang):</p>
+
+                              <!-- Variant A -->
+                              <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                        <input type="radio" name="correct-option" value="A" id="opt-a-radio" checked>
+                                        <label for="opt-a-radio"
+                                                  style="font-weight:bold; color:var(--button-color);">A)</label>
+                                        <input type="text" id="opt-a-text" placeholder="A variant..."
+                                                  style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:8px; font-size:14px; background:var(--bg-color); color:var(--text-color); outline:none;">
+                              </div>
+                              <!-- Variant B -->
+                              <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                        <input type="radio" name="correct-option" value="B" id="opt-b-radio">
+                                        <label for="opt-b-radio"
+                                                  style="font-weight:bold; color:var(--button-color);">B)</label>
+                                        <input type="text" id="opt-b-text" placeholder="B variant..."
+                                                  style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:8px; font-size:14px; background:var(--bg-color); color:var(--text-color); outline:none;">
+                              </div>
+                              <!-- Variant C -->
+                              <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                                        <input type="radio" name="correct-option" value="C" id="opt-c-radio">
+                                        <label for="opt-c-radio"
+                                                  style="font-weight:bold; color:var(--button-color);">C)</label>
+                                        <input type="text" id="opt-c-text" placeholder="C variant (ixtiyoriy)..."
+                                                  style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:8px; font-size:14px; background:var(--bg-color); color:var(--text-color); outline:none;">
+                              </div>
+                              <!-- Variant D -->
+                              <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                                        <input type="radio" name="correct-option" value="D" id="opt-d-radio">
+                                        <label for="opt-d-radio"
+                                                  style="font-weight:bold; color:var(--button-color);">D)</label>
+                                        <input type="text" id="opt-d-text" placeholder="D variant (ixtiyoriy)..."
+                                                  style="flex:1; padding:8px; border:1px solid var(--border-color); border-radius:8px; font-size:14px; background:var(--bg-color); color:var(--text-color); outline:none;">
+                              </div>
+
+                              <button class="btn-primary" onclick="submitQuestion()" id="btnSaveQuestion">
+                                        <i class="fa-solid fa-check"></i> Saqlash
+                              </button>
+                    </div>
+          </div>
+
+          <!-- Lug'at So'z Qo'shish Modali -->
+          <div id="add-word-modal"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center; opacity:0; transition: opacity 0.3s; padding:20px;">
+                    <div class="modal-content-animated"
+                              style="background:var(--card-bg); padding:20px; border-radius:16px; width:100%; max-width:400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                              <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                        <h3 style="margin:0; color:var(--text-color);">Yangi So'z</h3>
+                                        <button onclick="closeAddWordModal()"
+                                                  style="background:none; border:none; font-size:20px; color:var(--hint-color); cursor:pointer;"><i
+                                                            class="fa-solid fa-xmark"></i></button>
+                              </div>
+                              <input type="text" id="word-term" placeholder="Chet tilidagi so'z (Masalan: Apple)"
+                                        style="width:100%; padding:12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px; font-size:15px; background:var(--bg-color); color:var(--text-color); outline:none;">
+                              <input type="text" id="word-translation" placeholder="Tarjimasi (Masalan: Olma)"
+                                        style="width:100%; padding:12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:20px; font-size:15px; background:var(--bg-color); color:var(--text-color); outline:none;">
+
+                              <button class="btn-primary" onclick="submitWord()" id="btnSaveWord">
+                                        <i class="fa-solid fa-check"></i> Saqlash
+                              </button>
                     </div>
           </div>
 

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <title>LessonLab App</title>
+          <link rel="stylesheet" href="style.css">
+          <!-- Telegram WebApp JS -->
+          <script src="https://telegram.org/js/telegram-web-app.js"></script>
+          <!-- Zamonaviy ikonalar uchun FontAwesome -->
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+          <!-- Supabase JS -->
+          <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+          <!-- SweetAlert2 -->
+          <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+
+<body>
+
+          <!-- YUQORI HEADER -->
+          <header class="app-header">
+                    <h2 id="header-title">🗂 Testlarim</h2>
+                    <div class="user-profile" id="user-info"></div>
+          </header>
+
+          <!-- ASOSIY KONTENT (Sahifalar o'zgaradigan joy) -->
+          <main class="app-content">
+
+                    <!-- 0. DASHBOARD SAHIFASI -->
+                    <section id="tab-dashboard" class="tab-pane active">
+                              <div class="card"
+                                        style="background: linear-gradient(135deg, var(--button-color), #60a5fa); color: white;">
+                                        <h3 style="color:white; margin-bottom:5px;">Xush kelibsiz!</h3>
+                                        <p style="color:rgba(255,255,255,0.8); margin-bottom:0;">L-Lab Vision boshqaruv
+                                                  markazi</p>
+                              </div>
+                              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+                                        <div class="card" style="margin-bottom:0; text-align:center;">
+                                                  <h2 id="dash-test-count"
+                                                            style="color:var(--button-color); font-size:24px;">-</h2>
+                                                  <p style="margin-bottom:0; font-size:12px;">Testlar</p>
+                                        </div>
+                                        <div class="card" style="margin-bottom:0; text-align:center;">
+                                                  <h2 id="dash-dict-count" style="color:#10b981; font-size:24px;">-</h2>
+                                                  <p style="margin-bottom:0; font-size:12px;">Lug'atlar</p>
+                                        </div>
+                                        <div class="card" style="margin-bottom:0; text-align:center;">
+                                                  <h2 id="dash-class-count" style="color:#f59e0b; font-size:24px;">-
+                                                  </h2>
+                                                  <p style="margin-bottom:0; font-size:12px;">Sinflar</p>
+                                        </div>
+                                        <div class="card" style="margin-bottom:0; text-align:center;">
+                                                  <h2 id="dash-student-count" style="color:#8b5cf6; font-size:24px;">-
+                                                  </h2>
+                                                  <p style="margin-bottom:0; font-size:12px;">O'quvchilar</p>
+                                        </div>
+                              </div>
+                    </section>
+
+                    <!-- 1. TESTLARIM SAHIFASI -->
+                    <section id="tab-tests" class="tab-pane">
+                              <div class="card">
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                  <h3>Sizning Testlaringiz</h3>
+                                                  <button class="btn-sm"
+                                                            style="background:var(--button-color); color:white;"
+                                                            onclick="openCreateModal('test')"><i
+                                                                      class="fa-solid fa-plus"></i> Qo'shish</button>
+                                        </div>
+                                        <p>Bu yerda barcha testlar ro'yxati, boshqarish va boshlash tugmalari bo'ladi.
+                                        </p>
+                                        <div id="tests-list" class="mt-2" style="margin-top:10px;">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            Testlar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+
+                              <div class="card" style="margin-top: 15px;">
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                  <h3>Sizning Lug'atlaringiz</h3>
+                                                  <button class="btn-sm"
+                                                            style="background:var(--button-color); color:white;"
+                                                            onclick="openCreateModal('dict')"><i
+                                                                      class="fa-solid fa-plus"></i> Qo'shish</button>
+                                        </div>
+                                        <div id="dicts-list" class="mt-2" style="margin-top:10px;">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            Lug'atlar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+                    </section>
+
+                    <!-- 2. SINFLARIM SAHIFASI -->
+                    <section id="tab-classes" class="tab-pane">
+                              <div class="card" id="classes-card">
+                                        <h3>Sizning Sinflaringiz</h3>
+                                        <p>O'quvchilarga Pult (Remote ID) biriktirish uchun sinfni tanlang.</p>
+                                        <div id="classes-list" class="mt-2" style="margin-top: 10px;">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            Sinflar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+
+                              <!-- O'quvchilar Ro'yxati Darchasi (Yashirin) -->
+                              <div class="card" id="students-view" style="display: none;">
+                                        <div
+                                                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                  <h3 id="class-title-header">O'quvchilar</h3>
+                                                  <button class="btn-sm" onclick="closeStudentsView()">⬅️
+                                                            Orqaga</button>
+                                        </div>
+                                        <div id="students-list">
+                                                  <p
+                                                            style="color:var(--hint-color); font-size: 13px; text-align: center;">
+                                                            O'quvchilar yuklanmoqda...</p>
+                                        </div>
+                              </div>
+                    </section>
+
+                    <!-- 3. SOZLAMALAR SAHIFASI -->
+                    <section id="tab-settings" class="tab-pane">
+                              <div class="card">
+                                        <h3>Umumiy Sozlamalar</h3>
+                                        <p>Profillar, Arduino ulanish kodlari va boshqalar.</p>
+                              </div>
+                    </section>
+
+          </main>
+
+          <!-- PULT BIRIKTIRISH MODAL OYNASI -->
+          <div id="remote-modal"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
+                    <div
+                              style="background:var(--card-bg); padding:20px; border-radius:12px; width:90%; max-width:400px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                              <h3 style="margin-bottom:10px; color:var(--text-color);">Pultni Biriktirish</h3>
+                              <p style="font-size:14px; margin-bottom:15px; color:var(--hint-color);">
+                                        <strong id="remote-student-name"
+                                                  style="color:var(--text-color);">O'quvchi</strong> pultini
+                                        sozlayapmiz.
+                              </p>
+
+                              <div id="arduino-assign-status"
+                                        style="padding:10px; background:#fff3cd; color:#856404; border-radius:8px; margin-bottom:15px; font-size:13px; border-left: 4px solid #ffeeba;">
+                                        🟡 Arduinoga ulanilmagan
+                              </div>
+
+                              <button id="btnConnectArduino" class="btn-primary" style="margin-bottom:10px;"
+                                        onclick="connectArduinoForAssignment()">
+                                        🔗 Kompyuterga Ulanish
+                              </button>
+
+                              <div id="listening-status" style="display:none; margin:15px 0;">
+                                        <i class="fa-solid fa-satellite-dish"
+                                                  style="color:var(--button-color); font-size:24px; animation: pulse 1.5s infinite;"></i>
+                                        <p style="margin-top:10px; font-size:14px; color:var(--text-color);">O'quvchi
+                                                  pultdan biron tugmani bossin...</p>
+                              </div>
+
+                              <button class="btn-sm" style="width:100%; margin-top:10px; padding: 10px;"
+                                        onclick="closeRemoteModal()">Bekor qilish</button>
+                    </div>
+          </div>
+
+          <!-- YARATISH (CREATE) MODALI -->
+          <div id="create-modal"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center; opacity:0; transition: opacity 0.3s; padding:20px;">
+                    <div class="modal-content-animated"
+                              style="background:var(--card-bg); padding:20px; border-radius:16px; width:100%; max-width:400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                              <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                        <h3 id="create-modal-title" style="margin:0; color:var(--text-color);">Yangi
+                                                  Element</h3>
+                                        <button onclick="closeCreateModal()"
+                                                  style="background:none; border:none; font-size:20px; color:var(--hint-color); cursor:pointer;"><i
+                                                            class="fa-solid fa-xmark"></i></button>
+                              </div>
+                              <input type="hidden" id="create-type" value="">
+                              <input type="text" id="create-title-input" placeholder="Nomi (Masalan: Biologiya 9-sinf)"
+                                        style="width:100%; padding:12px 15px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:20px; font-size:15px; background:var(--bg-color); color:var(--text-color); outline:none;">
+
+                              <button id="btnCreateSubmit" class="btn-primary" onclick="submitCreateItem()">
+                                        <i class="fa-solid fa-check"></i> Saqlash
+                              </button>
+                    </div>
+          </div>
+
+          <!-- ACTION MODALI (START TEST / DICT) -->
+          <div id="action-modal"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:998; justify-content:center; align-items:flex-end; opacity:0; transition: opacity 0.3s;">
+                    <div class="modal-content-animated"
+                              style="background:var(--card-bg); padding:20px; border-radius:20px 20px 0 0; width:100%; max-width:600px; box-shadow: 0 -5px 20px rgba(0,0,0,0.1);">
+                              <div
+                                        style="width: 40px; height: 5px; background: var(--hint-color); border-radius: 5px; margin: 0 auto 15px; opacity: 0.5;">
+                              </div>
+                              <div
+                                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                        <h3 id="action-modal-title" style="margin:0; color:var(--text-color);">Testni
+                                                  Boshlash</h3>
+                                        <button onclick="closeActionModal()"
+                                                  style="background:none; border:none; font-size:20px; color:var(--hint-color); cursor:pointer;"><i
+                                                            class="fa-solid fa-xmark"></i></button>
+                              </div>
+                              <input type="hidden" id="action-item-id" value="">
+                              <input type="hidden" id="action-item-type" value="">
+
+                              <ul class="item-list" style="margin-bottom: 20px;">
+                                        <li style="cursor:pointer;" onclick="startAction('private')">
+                                                  <span>📱 Bu testni boshlash</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer;" onclick="startAction('qr')">
+                                                  <span>✨ Guruhda QR kodli boshlash</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer;" onclick="startAction('remote')">
+                                                  <span>🎛 Pult bilan boshlash</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer;" onclick="startAction('group')">
+                                                  <span>👥 Guruhda boshlash</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer;" onclick="startAction('share')">
+                                                  <span>🔗 Testni ulashish</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer; color: #ef4444;" onclick="startAction('homework')">
+                                                  <span>📝 Homework qilib jo'natish (Yangi)</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                                        <li style="cursor:pointer; color: #3b82f6;" onclick="startAction('pdf')">
+                                                  <span>📄 PDF Yuklab olish (Yangi)</span>
+                                                  <i class="fa-solid fa-chevron-right"
+                                                            style="color:var(--hint-color); font-size:12px;"></i>
+                                        </li>
+                              </ul>
+                    </div>
+          </div>
+
+          <!-- PASTKI NAVIGATSIYA (BOTTOM NAVIGATION) -->
+          <nav class="bottom-nav">
+                    <div class="nav-item active" onclick="switchTab('dashboard', '📊 Dashboard', this)">
+                              <i class="fa-solid fa-chart-pie"></i>
+                              <span>Asosiy</span>
+                    </div>
+                    <div class="nav-item" onclick="switchTab('tests', '🗂 Testlarim', this)">
+                              <i class="fa-solid fa-folder-open"></i>
+                              <span>Testlar</span>
+                    </div>
+                    <div class="nav-item" onclick="switchTab('classes', '👥 Sinflarim', this)">
+                              <i class="fa-solid fa-users"></i>
+                              <span>Sinflar</span>
+                    </div>
+                    <div class="nav-item" onclick="switchTab('settings', '⚙️ Sozlamalar', this)">
+                              <i class="fa-solid fa-gear"></i>
+                              <span>Sozlama</span>
+                    </div>
+          </nav>
+
+          <script src="supabaseConfig.js"></script>
+          <script src="app.js"></script>
+</body>
+
+</html>
+<!-- version cache bust -->
