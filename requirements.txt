@@ -1,0 +1,6 @@
+aiogram
+python-docx
+openpyxl
+paho-mqtt
+pandas
+xlsxwriter

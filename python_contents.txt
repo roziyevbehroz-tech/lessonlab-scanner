@@ -1,0 +1,11 @@
+ Volume in drive C is Windows
+ Volume Serial Number is A0DF-8353
+
+ Directory of C:\Users\Behruz\AppData\Local\Programs\Python\Python312
+
+05/04/2025  09:38    <DIR>          .
+05/04/2025  09:37    <DIR>          ..
+05/04/2025  09:38    <DIR>          Lib
+05/04/2025  09:36    <DIR>          Scripts
+               0 File(s)              0 bytes
+               4 Dir(s)  23,220,531,200 bytes free

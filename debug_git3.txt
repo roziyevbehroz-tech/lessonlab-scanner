@@ -1,0 +1,5 @@
+commit 9f4fd489f0d2493c196a66ee592e4598add04898
+Author: Ruziyev Behruz <roziyevbehroz@gmail.com>
+Date:   Fri Feb 27 01:29:53 2026 +0500
+
+    MiniApp: Asosiy oyna, animatsiyalar va yangi element qo'shish funksiyalari

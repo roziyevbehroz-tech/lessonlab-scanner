@@ -1,0 +1,2 @@
+origin	https://github.com/roziyevbehroz-tech/lessonlab-scanner.git (fetch)
+origin	https://github.com/roziyevbehroz-tech/lessonlab-scanner.git (push)

@@ -1,0 +1,18 @@
+ Volume in drive C is Windows
+ Volume Serial Number is A0DF-8353
+
+ Directory of C:\Users
+
+23/03/2025  18:14    <DIR>          .
+25/02/2026  08:07    <DIR>          Behruz
+27/03/2025  14:59    <DIR>          defaultuser100000
+27/03/2025  14:59    <DIR>          defaultuser100000.hp
+27/03/2025  14:59    <DIR>          defaultuser100000.hp.000
+27/03/2025  14:59    <DIR>          defaultuser100000.hp.001
+27/03/2025  14:59    <DIR>          defaultuser100001
+27/03/2025  14:59    <DIR>          defaultuser100001.hp
+20/05/2025  17:04    <DIR>          ILM-NAJOT EDU
+27/03/2025  15:13    <DIR>          Public
+24/11/2025  07:04    <DIR>          WsiAccount
+               0 File(s)              0 bytes
+              11 Dir(s)  23,241,191,424 bytes free

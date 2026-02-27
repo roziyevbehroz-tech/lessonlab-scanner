@@ -1,0 +1,7 @@
+commit 12658276bc6bcd989820f00ce473bfd2dd3a7d47
+Author: roziyevbehroz-tech <roziyevbehroz@gmail.com>
+Date:   Thu Feb 26 23:54:49 2026 +0500
+
+    Add files via upload
+
+A	miniapp/index.html

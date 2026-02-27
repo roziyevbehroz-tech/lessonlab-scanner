@@ -1,0 +1,17 @@
+System Volume Information/IndexerVolumeGuid
+System Volume Information/WPSettings.dat
+app.js
+aruco.js
+cv.js
+debug.html
+display.html
+index.html
+markers.html
+miniapp/app.js
+miniapp/index.html
+miniapp/style.css
+miniapp/supabaseConfig.js
+remote.html
+scanner_handlers.py
+style.css
+test_detection.html

@@ -1,0 +1,166 @@
+﻿import asyncio, logging, os, json
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.filters import Command, StateFilter
+from aiogram.types import FSInputFile
+from database import Database; from test_parser import LessonLabParser; from file_handler import FileHandler
+from keyboards import *; from handlers import test_handlers, creation_handlers
+
+T = "8145781782:AAFfD5AE78OGA74-U0YmJGu3l9AqGcIGIKQ"
+bot, dp = Bot(token=T), Dispatcher()
+db, prs, fh = Database(), LessonLabParser(), FileHandler()
+for r in [test_handlers.router, creation_handlers.router]: dp.include_router(r)
+
+@dp.message(Command("start"))
+async def start(m: types.Message): await m.answer(f"ðŸ‘‹ Salom! <b>{m.from_user.full_name}</b>", reply_markup=main_menu, parse_mode="HTML")
+
+@dp.message(F.text == "â™»ï¸ Testlar")
+async def t_menu(m: types.Message): await m.answer("âŒ›ï¸ Tanlang:", reply_markup=get_test_selection_menu(), parse_mode="HTML")
+
+@dp.message(F.text == "ðŸ“— Mening testlarim")
+async def my_t(m: types.Message): await m.answer("ðŸ“— Testlar", reply_markup=get_items_keyboard(db.get_user_tests(m.from_user.id), db=db), parse_mode="HTML")
+
+@dp.message(F.document)
+async def doc(m: types.Message):
+    f = await bot.get_file(m.document.file_id); p = os.path.join("downloads", m.document.file_name); os.makedirs("downloads", exist_ok=True)
+    await bot.download_file(f.file_path, p)
+    if p.endswith('.docx'):
+        d = prs.parse_text(fh.parse_word(p)); d['title'] = m.document.file_name
+        db.save_full_test(m.from_user.id, d); await m.answer(f"âœ… {len(d['questions'])} q!")
+    os.remove(p)
+
+@dp.message(F.text & ~F.text.startswith("/"), StateFilter(None))
+async def txt(m: types.Message):
+    if m.text in ["â™»ï¸ Testlar", "ðŸ“— Mening testlarim", "ðŸ‘¤ Profil"]: return
+    d = prs.parse_text(m.text)
+    if d['questions']: db.save_full_test(m.from_user.id, d); await m.answer(f"âœ… {len(d['questions'])} q!")
+    else: await m.answer("âš ï¸ Format xato.")
+
+@dp.callback_query(F.data == "main_menu")
+async def home(c: types.CallbackQuery): await c.message.delete(); await c.message.answer("ðŸ  Menyu", reply_markup=main_menu)
+
+async def main():
+    await bot.set_my_commands([types.BotCommand(command="start", description="Start")])
+    await dp.start_polling(bot)
+
+if __name__ == "__main__": asyncio.run(main())
+from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
+from aiogram.types import FSInputFile
+import os
+from database import Database
+from keyboards import *
+from docx_generator import generate_test_docx
+
+router = Router(); db = Database()
+from aiogram.fsm.state import State, StatesGroup
+class TestDeletion(StatesGroup): selecting = State(); confirming = State()
+
+@router.callback_query(F.data.startswith("manage_test_"))
+async def manage(c: types.CallbackQuery):
+    tid = int(c.data.split("_")[2])
+    t, n = db.get_test_title(tid), db.get_question_count(tid)
+    await c.message.edit_text(f"ðŸ“— <b>{t} ({n} q)</b>\n\nTanlang:", reply_markup=get_test_management_keyboard(tid), parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("view_ques_"))
+async def view(c: types.CallbackQuery):
+    tid = int(c.data.split("_")[2]); t, qs = db.get_test_title(tid), db.get_test_questions(tid)
+    if not qs: return await c.answer("Savollar yo'q.", show_alert=True)
+    await c.answer("âŒ›ï¸..."); path = os.path.join(os.getcwd(), f"{tid}.docx")
+    generate_test_docx(t, qs, path)
+    await c.message.answer_document(FSInputFile(path), caption=f"ðŸ“˜ {t}")
+
+@router.callback_query(F.data == "del_test_mode")
+async def del_mode(c: types.CallbackQuery, state: FSMContext):
+    ts = db.get_user_tests(c.from_user.id)
+    if not ts: return await c.answer("Yo'q.", show_alert=True)
+    await state.set_state(TestDeletion.selecting); await state.update_data(selected_ids=[])
+    await c.message.edit_text("âŒ›ï¸ Tanlang:", reply_markup=get_items_keyboard(ts, custom_prefix="del_sel", db=db), parse_mode="HTML")
+
+@router.callback_query(TestDeletion.selecting, F.data.startswith("del_sel_"))
+async def toggl(c: types.CallbackQuery, state: FSMContext):
+    tid, data = int(c.data.split("_")[2]), await state.get_data()
+    ids = data.get('selected_ids', []); ids.remove(tid) if tid in ids else ids.append(tid)
+    await state.update_data(selected_ids=ids)
+    await c.message.edit_reply_markup(reply_markup=get_items_keyboard(db.get_user_tests(c.from_user.id), "del_sel", db, "del_sel", selected_ids=ids))
+
+@router.callback_query(F.data == "trigger_delete")
+async def trig(c: types.CallbackQuery, state: FSMContext):
+    if not (await state.get_data()).get('selected_ids'): return await c.answer("Tanlang!", show_alert=True)
+    await c.message.edit_text("âš ï¸ O'chirilsinmi?", reply_markup=get_confirm_keyboard())
+    await state.set_state(TestDeletion.confirming)
+
+@router.callback_query(TestDeletion.confirming, F.data == "confirm_delete")
+async def conf(c: types.CallbackQuery, state: FSMContext):
+    for tid in (await state.get_data()).get('selected_ids', []): db.delete_test(tid)
+    await state.clear(); await c.answer("O'chirildi!"); await back_t(c)
+
+@router.callback_query(F.data == "select_test")
+async def sel(c: types.CallbackQuery):
+    ts = db.get_user_tests(c.from_user.id)
+    if ts: await c.message.edit_text("ðŸ“— <b>Tanlang:</b>", reply_markup=get_items_keyboard(ts, "run_sel", db, "run_sel"), parse_mode="HTML")
+    else: await c.answer("Yo'q.")
+
+@router.callback_query(F.data.startswith("run_sel_"))
+async def run_opt(c: types.CallbackQuery):
+    tid = int(c.data.split("_")[2])
+    await c.message.edit_text(f"ðŸš€ <b>{db.get_test_title(tid)}</b>", reply_markup=get_test_run_keyboard(tid), parse_mode="HTML")
+
+@router.callback_query(F.data == "back_to_select")
+async def back_s(c: types.CallbackQuery): await sel(c)
+
+@router.callback_query(F.data == "back_to_tests")
+async def back_t(c: types.CallbackQuery): await c.message.edit_text("ðŸ“— Testlaringiz:", reply_markup=get_items_keyboard(db.get_user_tests(c.from_user.id), db=db))
+
+@router.callback_query(F.data == "cancel_action")
+async def canc(c: types.CallbackQuery, state: FSMContext): await state.clear(); await back_t(c)
+
+from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
+from database import Database
+from keyboards import *
+from test_parser import LessonLabParser
+
+router = Router(); db, prs = Database(), LessonLabParser()
+from aiogram.fsm.state import State, StatesGroup
+class TestCreation(StatesGroup): w_title = State(); w_qs = State(); w_new_t = State()
+
+@router.callback_query(F.data == "add_test_start")
+async def start(c: types.CallbackQuery, state: FSMContext):
+    await c.message.answer("âœï¸ Nom:", reply_markup=cancel_kb)
+    await state.set_state(TestCreation.w_title)
+
+@router.message(TestCreation.w_title)
+async def title(m: types.Message, state: FSMContext):
+    if m.text == "âŒ Bekor qilish": await state.clear(); return await m.answer("Bekor.", reply_markup=main_menu)
+    db.save_full_test(m.from_user.id, {'title': m.text, 'questions': []})
+    await state.clear(); await m.answer("âœ…!", reply_markup=main_menu)
+    await m.answer("ðŸ“— Testlar:", reply_markup=get_items_keyboard(db.get_user_tests(m.from_user.id), db=db))
+
+@router.callback_query(F.data.startswith("edit_title_"))
+async def rename(c: types.CallbackQuery, state: FSMContext):
+    await state.update_data(id=int(c.data.split("_")[2]))
+    await c.message.answer("âœï¸ Yangi:", reply_markup=cancel_kb); await state.set_state(TestCreation.w_new_t)
+
+@router.message(TestCreation.w_new_t)
+async def p_new_t(m: types.Message, state: FSMContext):
+    if m.text == "âŒ Bekor qilish": await state.clear(); return await m.answer("Bekor.", reply_markup=main_menu)
+    db.rename_test((await state.get_data())['id'], m.text); await state.clear()
+    await m.answer("âœ…!", reply_markup=main_menu)
+    await m.answer("ðŸ“— Testlar:", reply_markup=get_items_keyboard(db.get_user_tests(m.from_user.id), db=db))
+
+@router.callback_query(F.data.startswith("add_ques_"))
+async def add_q(c: types.CallbackQuery, state: FSMContext):
+    await state.update_data(id=int(c.data.split("_")[2]))
+    await c.message.answer("âŒ›ï¸ Savollar:", reply_markup=stop_kb); await state.set_state(TestCreation.w_qs)
+
+@router.message(TestCreation.w_qs)
+async def p_q(m: types.Message, state: FSMContext):
+    if m.text == "â›” To'xtatish": await state.clear(); return await m.answer("OK.", reply_markup=main_menu)
+    p = prs.parse_text(m.text)
+    if p['questions']:
+        db.add_questions_to_test((await state.get_data())['id'], p['questions'])
+        await m.answer(f"âœ… {len(p['questions'])} ta!")
+    else: await m.answer("Xato.")
+
+# Init
+

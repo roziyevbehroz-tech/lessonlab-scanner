@@ -1,0 +1,4 @@
+100644 6baf3d1ade0b701beb779919e247f14b8e002ed5 0	miniapp/app.js
+100644 96b603776ddb5323ac16edd247594aef5f672cd0 0	miniapp/index.html
+100644 44279516075c84c544af18bc7870f2074cb5e03e 0	miniapp/style.css
+100644 17debdec3b40cc28793b707f21527b44529aff94 0	miniapp/supabaseConfig.js

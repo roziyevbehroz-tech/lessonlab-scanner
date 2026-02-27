@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>LessonLab Scanner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        #overlay {
+            position: absolute; bottom: 20px; left: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.7); color: white; padding: 15px;
+            border-radius: 15px; font-size: 16px; display: flex; justify-content: space-between; align-items: center;
+        }
+        #status { font-weight: bold; color: #ffcc00; }
+        #count { font-size: 20px; font-weight: bold; color: #00ff00; }
+        .btn {
+            background: #2481cc; color: white; border: none; padding: 10px 20px;
+            border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <video id="videoInput" playsinline webkit-playsinline></video>
+    <canvas id="canvasOutput"></canvas>
+    
+    <div id="overlay">
+        <div>
+            <div id="status">⏳ OpenCV yuklanmoqda...</div>
+            <div style="font-size: 12px; margin-top: 5px;">Skanerlangan: <span id="count">0</span></div>
+        </div>
+        <button class="btn" onclick="sendResults()">Javoblarni Yuborish</button>
+    </div>
+</div>
+
+<script>
+    let tg = window.Telegram.WebApp;
+    tg.expand();
+
+    let video = document.getElementById('videoInput');
+    let canvas = document.getElementById('canvasOutput');
+    let ctx = canvas.getContext('2d');
+    let status = document.getElementById('status');
+    let countDisplay = document.getElementById('count');
+
+    let stream = null;
+    let detectedAnswers = {}; // {Student_ID: "A"}
+
+    // 1. Kamerani yoqish
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
+            video.srcObject = stream;
+            video.play();
+            status.innerText = "Kamera ishga tushdi!";
+        } catch (err) {
+            status.innerText = "Xato: Kamera ruxsati yo'q!";
+        }
+    }
+
+    // 2. OpenCV yuklanganda ishga tushadi
+    function onOpenCvReady() {
+        status.innerText = "✅ Tizim tayyor! Kartani ko'rsating.";
+        startCamera();
+        video.addEventListener('play', processVideo);
+    }
+
+    // 3. Videoni tahlil qilish (ENG MUHIM QISM)
+    function processVideo() {
+        if (!stream) return;
+
+        let cap = new cv.VideoCapture(video);
+        let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+        let gray = new cv.Mat();
+        
+        // ArUco lug'ati (4x4)
+        let dictionary = new cv.aruco_Dictionary(cv.DICT_4X4_50);
+        let markerCorners = new cv.MatVector();
+        let markerIds = new cv.Mat();
+
+        // Canvas o'lchamini videoga moslash
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        function loop() {
+            if (video.paused || video.ended) return;
+
+            // Har bir kadrni olamiz
+            cap.read(src);
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+            // Markerlarni qidiramiz
+            cv.detectMarkers(gray, dictionary, markerCorners, markerIds);
+
+            // Agar marker topilsa
+            if (markerIds.rows > 0) {
+                // Ekranga yashil chiziq chizamiz
+                cv.drawDetectedMarkers(src, markerCorners, markerIds);
+                
+                // Javoblarni o'qiymiz
+                for (let i = 0; i < markerIds.rows; ++i) {
+                    let id = markerIds.data32S[i]; // O'quvchi ID si
+                    let corners = markerCorners.get(i);
+                    
+                    // Aylanishni aniqlash (A/B/C/D)
+                    let answer = calculateRotation(corners);
+                    
+                    // Natijani saqlaymiz
+                    detectedAnswers[id] = answer;
+                }
+                
+                // Ekranda sonini yangilaymiz
+                countDisplay.innerText = Object.keys(detectedAnswers).length;
+                status.innerText = `🔍 Topildi: ${Object.keys(detectedAnswers).length} ta`;
+            }
+
+            // Natijani Canvasga chizamiz
+            cv.imshow('canvasOutput', src);
+
+            // Keyingi kadrga o'tamiz
+            requestAnimationFrame(loop);
+        }
+        
+        // Loopni boshlash
+        requestAnimationFrame(loop);
+    }
+
+    // 4. Aylanish burchagidan Javobni topish (Logika)
+    function calculateRotation(corners) {
+        // ArUco burchaklari: [TopLeft, TopRight, BottomRight, BottomLeft]
+        let tl = corners.data32F.slice(0, 2); // Top Left X, Y
+        let tr = corners.data32F.slice(2, 4); // Top Right X, Y
+        
+        // Oddiy mantiq: Yuqori chap burchak qayerda joylashgan?
+        // Bu joyni keyinroq aniq matematika bilan kuchaytiramiz. 
+        // Hozircha "Topildi" degan signal muhim.
+        return "A"; // Hozircha hammaga A deb turadi (Test uchun)
+    }
+
+    // 5. Botga yuborish
+    function sendResults() {
+        if (Object.keys(detectedAnswers).length === 0) {
+            alert("Hali hech qanday javob skanerlanmadi!");
+            return;
+        }
+        // Ma'lumotni Telegramga qaytarib yuboramiz
+        tg.sendData(JSON.stringify(detectedAnswers));
+    }
+</script>
+</body>
+</html>
