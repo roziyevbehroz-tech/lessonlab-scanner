@@ -63,6 +63,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadDashboardStats() {
     try {
+        const cached = localStorage.getItem('cache_dash_' + currentUserId);
+        if (cached) {
+            try {
+                const c = JSON.parse(cached);
+                if (c.t !== undefined) document.getElementById('dash-test-count').innerText = c.t;
+                if (c.d !== undefined) document.getElementById('dash-dict-count').innerText = c.d;
+                if (c.c !== undefined) document.getElementById('dash-class-count').innerText = c.c;
+                if (c.s !== undefined) document.getElementById('dash-student-count').innerText = c.s;
+            } catch (e) { }
+        }
+
         // Test count
         const { count: testCount } = await supabaseClient.from('bot_tests').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
         document.getElementById('dash-test-count').innerText = testCount || 0;
@@ -86,6 +97,10 @@ async function loadDashboardStats() {
         }
         document.getElementById('dash-student-count').innerText = studentCount;
 
+        localStorage.setItem('cache_dash_' + currentUserId, JSON.stringify({
+            t: testCount || 0, d: dictCount || 0, c: classCount || 0, s: studentCount
+        }));
+
     } catch (err) {
         console.error("Dashboard yuklashda xato:", err);
     }
@@ -94,10 +109,16 @@ async function loadDashboardStats() {
 async function loadDictionaries() {
     const listEl = document.getElementById('dicts-list');
     if (!listEl) return;
-    listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Lug\'atlar yuklanmoqda...</p>';
+
+    const cachedHtml = localStorage.getItem('cache_dicts_' + currentUserId);
+    if (cachedHtml) {
+        listEl.innerHTML = cachedHtml;
+    } else {
+        listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Lug\'atlar yuklanmoqda...</p>';
+    }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bot_dictionaries')
             .select('*')
             .eq('user_id', currentUserId)
@@ -122,20 +143,30 @@ async function loadDictionaries() {
         });
         html += '</ul>';
         listEl.innerHTML = html;
+        localStorage.setItem('cache_dicts_' + currentUserId, html);
 
     } catch (err) {
         console.error("Lug'atlarni yuklashda xato:", err);
-        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
+        if (!cachedHtml) {
+            listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
+        }
     }
 }
 
 async function loadTests() {
     const listEl = document.getElementById('tests-list');
     if (!listEl) return;
-    listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Testlar yuklanmoqda...</p>';
+
+    const cachedHtml = localStorage.getItem('cache_tests_' + currentUserId);
+    if (cachedHtml) {
+        listEl.innerHTML = cachedHtml;
+    } else {
+        listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Testlar yuklanmoqda...</p>';
+    }
+
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bot_tests')
             .select('*')
             .eq('user_id', currentUserId)
@@ -160,19 +191,28 @@ async function loadTests() {
         });
         html += '</ul>';
         listEl.innerHTML = html;
+        localStorage.setItem('cache_tests_' + currentUserId, html);
 
     } catch (err) {
         console.error("Testlarni yuklashda xato:", err);
-        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
+        if (!cachedHtml) {
+            listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
+        }
     }
 }
 
 async function loadClasses() {
     const listEl = document.getElementById('classes-list');
-    listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Sinflar yuklanmoqda...</p>';
+
+    const cachedHtml = localStorage.getItem('cache_classes_' + currentUserId);
+    if (cachedHtml) {
+        listEl.innerHTML = cachedHtml;
+    } else {
+        listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Sinflar yuklanmoqda...</p>';
+    }
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bot_classes')
             .select('*')
             .eq('user_id', currentUserId)
@@ -194,10 +234,13 @@ async function loadClasses() {
         });
         html += '</ul>';
         listEl.innerHTML = html;
+        localStorage.setItem('cache_classes_' + currentUserId, html);
 
     } catch (err) {
         console.error("Sinflarni yuklashda xato:", err);
-        listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik yuz berdi. Pultni sozlaganmisiz?</p>`;
+        if (!cachedHtml) {
+            listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik yuz berdi. Pultni sozlaganmisiz?</p>`;
+        }
     }
 }
 
@@ -221,7 +264,7 @@ async function loadStudents(classId) {
     listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">O\'quvchilar yuklanmoqda...</p>';
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bot_students')
             .select('*')
             .eq('class_id', classId)
@@ -385,7 +428,7 @@ async function processAssignmentSignal(signalData) {
         document.getElementById('listening-status').innerHTML = `<p style="color:#10b981; font-weight:bold; text-align:center;"><i class="fa-solid fa-check-circle"></i> ID: ${remoteId} olindi! Saqlanmoqda...</p>`;
 
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('bot_students')
                 .update({ remote_id: remoteId })
                 .eq('id', studentIdToSave);
@@ -550,7 +593,7 @@ async function loadQuestions(testId) {
 
     try {
         // Fetch questions
-        const { data: questions, error: qError } = await supabase
+        const { data: questions, error: qError } = await supabaseClient
             .from('bot_questions')
             .select('*')
             .eq('test_id', testId)
@@ -565,7 +608,7 @@ async function loadQuestions(testId) {
 
         // Fetch options for these questions
         const qIds = questions.map(q => q.id);
-        const { data: options, error: optError } = await supabase
+        const { data: options, error: optError } = await supabaseClient
             .from('bot_options')
             .select('*')
             .in('question_id', qIds);
@@ -640,7 +683,7 @@ async function submitQuestion() {
 
     try {
         // 1. Insert Question
-        const { data: qData, error: qErr } = await supabase
+        const { data: qData, error: qErr } = await supabaseClient
             .from('bot_questions')
             .insert([{ test_id: currentTestId, text: text, hint: '' }])
             .select()
@@ -701,7 +744,7 @@ async function loadWords(dictId) {
     listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">So\'zlar yuklanmoqda...</p>';
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('bot_dictionary_words')
             .select('*')
             .eq('dictionary_id', dictId)
@@ -763,7 +806,7 @@ async function submitWord() {
     btn.innerHTML = 'Saqlanmoqda...';
 
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('bot_dictionary_words')
             .insert([{ dictionary_id: currentDictId, word: word, translation: translation }]);
 
