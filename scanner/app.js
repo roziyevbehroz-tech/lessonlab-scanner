@@ -156,7 +156,7 @@
 
         document.getElementById('current-q').textContent = idx + 1;
         document.getElementById('total-q').textContent = qCount;
-        document.getElementById('questionText').textContent = q.text;
+        document.getElementById('questionText').textContent = q.text || "Savol matni mavjud emas";
 
         // Reset Options Pre-Scan State
         var preScan = document.getElementById('preScanOptions');
