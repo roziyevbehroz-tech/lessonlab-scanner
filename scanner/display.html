@@ -1190,6 +1190,11 @@
                 const badge = document.getElementById('connection-status');
                 if (status === 'SUBSCRIBED') {
                     badge.innerHTML = '<i class="fa-solid fa-wifi" style="color:var(--success)"></i> Sinxron: Faol';
+                    // Auto-start the test once connected
+                    if (screens.lobby.classList.contains('active')) {
+                        currentQuestionIndex = 0;
+                        renderQuestion();
+                    }
                 } else {
                     badge.innerHTML = '<i class="fa-solid fa-wifi" style="color:var(--warning)"></i> Uzildi... Qidirilmoqda';
                 }
