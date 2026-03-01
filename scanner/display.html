@@ -1303,27 +1303,37 @@
             showScreen('question');
             studentAnswersCurrent = {};
 
-            totalTimeMs = (parseInt(document.getElementById('setting-timer').value) || 30) * 1000;
+            const timerInput = document.getElementById('setting-timer');
+            totalTimeMs = (timerInput ? parseInt(timerInput.value) || 30 : 30) * 1000;
+
+            const _el_question_text = document.getElementById('question-text');
+            const badge = document.getElementById('top-question-badge');
+
+            if (!questions || questions.length === 0) {
+                if (_el_question_text) _el_question_text.innerText = "Xatolik: Ushbu testda hech qanday savol topilmadi. Yoki internet uzildi.";
+                if (badge) badge.innerText = `Question 0/0`;
+                return;
+            }
 
             if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) return;
             const q = questions[currentQuestionIndex];
 
-            const _el_question_text = document.getElementById('question-text');
-            if (_el_question_text) _el_question_text.innerText = `${currentQuestionIndex + 1}. ${q.text}`;
-            const badge = document.getElementById('top-question-badge');
+            if (_el_question_text) _el_question_text.innerText = `${currentQuestionIndex + 1}. ${q.text || 'Savol matni yo\'q'}`;
             if (badge) badge.innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
             updateSidebar();
 
             let optsHtml = '';
             const labels = ['A', 'B', 'C', 'D'];
-            q.options.forEach((opt, idx) => {
-                optsHtml += `
+            if (q.options && q.options.length > 0) {
+                q.options.forEach((opt, idx) => {
+                    optsHtml += `
                     <div class="option-btn opt-${idx}">
                         <div class="badge">${labels[idx]}</div>
                         ${opt.text}
                     </div>
                 `;
-            });
+                });
+            }
             const _elH_options_grid = document.getElementById('options-grid');
             if (_elH_options_grid) _elH_options_grid.innerHTML = optsHtml;
 
