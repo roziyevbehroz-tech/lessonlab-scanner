@@ -76,7 +76,8 @@
                         class="fas fa-chevron-down" id="results-toggle-icon"></i>
                 </div>
 
-                <div id="results-bars-container" style="display: flex; flex-direction: column; gap: 12px;">
+                <div id="results-bars-container"
+                    style="display: flex; flex-direction: column; gap: 12px; overflow: hidden; max-height: 500px; transition: max-height 0.3s ease;">
                     <!-- Option A -->
                     <div class="wg-res-bar" id="resBarA">
                         <div class="res-fill"></div>
@@ -164,7 +165,7 @@
             <!-- Handle -->
             <div class="drawer-handle"></div>
             <!-- Responses Count -->
-            <div class="responses-header">
+            <div class="responses-header scan-stats">
                 <i class="fas fa-users"></i> <span id="sheet-scanned-count">0</span> responses <i
                     class="fas fa-chevron-up" style="margin-left: 5px; font-size: 12px;"></i>
             </div>
@@ -188,6 +189,15 @@
                 saqlash</button>
             <p id="sendStatus" style="text-align:center;font-size:13px;color:#94a3b8;margin: 0;"></p>
         </div>
+    </div>
+
+    <!-- Bottom Sheet Modal (User requested) -->
+    <div id="results-bottom-sheet" class="hidden-sheet">
+        <div class="sheet-header" id="closeSheetBtn">
+            <span>Skaner qilingan o'quvchilar</span>
+            <i class="fas fa-chevron-down"></i>
+        </div>
+        <div class="sheet-body" id="scannedGrid"></div>
     </div>
 
 

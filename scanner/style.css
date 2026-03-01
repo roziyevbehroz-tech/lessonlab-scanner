@@ -505,14 +505,13 @@ html {
    ZOOM CONTROLS
    ============================================ */
 .wg-zoom-controls {
-    position: absolute;
+    position: fixed;
     top: 20px;
-    left: 20px;
+    right: 20px;
+    z-index: 9999;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    z-index: 50;
+    gap: 10px;
 }
 
 .zoom-badge {
@@ -644,6 +643,52 @@ html {
     background: #3d1c1c;
     color: #ef4444;
 }
+
+/* Bottom Sheet User Request */
+.hidden-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 60dvh;
+    background: #252525;
+    border-radius: 24px 24px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 2000;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.hidden-sheet.active {
+    transform: translateY(0);
+}
+
+.sheet-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 18px;
+    font-weight: bold;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    color: #fff;
+}
+
+.sheet-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 
 .action-btn {
     width: 100%;

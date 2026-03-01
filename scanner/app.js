@@ -267,7 +267,7 @@
 
         document.getElementById('sheet-scanned-count').textContent = count;
 
-        var listContainer = document.getElementById('scanned-students-list');
+        var listContainer = document.getElementById('scannedGrid');
         if (listContainer) {
             listContainer.innerHTML = listHtml;
         }
@@ -693,18 +693,18 @@
     });
 
     // ─── UI TOGGLES ───
-    var drawerToggle = document.getElementById('drawer-toggle');
-    if (drawerToggle) {
-        drawerToggle.addEventListener('click', function () {
-            var list = document.getElementById('scanned-students-list');
-            var icon = document.getElementById('drawer-icon');
-            if (list.style.display === 'none') {
-                list.style.display = 'flex';
-                icon.className = 'fas fa-chevron-down';
-            } else {
-                list.style.display = 'none';
-                icon.className = 'fas fa-chevron-up';
-            }
+    var scanStats = document.querySelector('.scan-stats');
+    if (scanStats) {
+        scanStats.addEventListener('click', function () {
+            var sheet = document.getElementById('results-bottom-sheet');
+            if (sheet) sheet.classList.add('active');
+        });
+    }
+    var closeSheet = document.getElementById('closeSheetBtn');
+    if (closeSheet) {
+        closeSheet.addEventListener('click', function () {
+            var sheet = document.getElementById('results-bottom-sheet');
+            if (sheet) sheet.classList.remove('active');
         });
     }
 
