@@ -52,8 +52,10 @@
 
         /* Top Bar */
         .top-bar {
-            padding: 1.5rem 3rem;
+            padding: clamp(0.5rem, 2vw, 1.5rem) clamp(1rem, 3vw, 3rem);
             display: flex;
+            flex-wrap: wrap;
+            /* <--- Kichik ekranda sig'ishi uchun muhim */
             justify-content: space-between;
             align-items: center;
             background: rgba(15, 23, 42, 0.8);
@@ -63,7 +65,7 @@
         }
 
         .top-bar .title {
-            font-size: 2.5rem;
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
             font-weight: 900;
             background: linear-gradient(135deg, #60a5fa, #c084fc);
             -webkit-background-clip: text;
@@ -108,7 +110,7 @@
 
         /* --- LOBBY SCREEN --- */
         .lobby-title {
-            font-size: 6rem;
+            font-size: clamp(2.5rem, 8vw, 6rem);
             font-weight: 900;
             margin-bottom: 1rem;
             text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -116,7 +118,7 @@
         }
 
         .lobby-subtitle {
-            font-size: 3rem;
+            font-size: clamp(1.2rem, 4vw, 3rem);
             font-weight: 700;
             color: var(--warning);
             margin-bottom: 4rem;
@@ -953,6 +955,12 @@
     <div id="toast-container"></div>
 
     <script>
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.expand();
+            }
+        } catch (e) { console.log("Telegram WebApp topilmadi"); }
+
         const urlParams = new URLSearchParams(window.location.search);
         const testId = urlParams.get('test_id');
         const classId = urlParams.get('class_id');
@@ -1190,11 +1198,6 @@
                 const badge = document.getElementById('connection-status');
                 if (status === 'SUBSCRIBED') {
                     badge.innerHTML = '<i class="fa-solid fa-wifi" style="color:var(--success)"></i> Sinxron: Faol';
-                    // Auto-start the test once connected
-                    if (screens.lobby.classList.contains('active')) {
-                        currentQuestionIndex = 0;
-                        renderQuestion();
-                    }
                 } else {
                     badge.innerHTML = '<i class="fa-solid fa-wifi" style="color:var(--warning)"></i> Uzildi... Qidirilmoqda';
                 }
