@@ -15,7 +15,7 @@ db = Database()
 # In-memory session tracking: {user_id: {chat_id, test_id, title, class_name, total_q}}
 scanner_sessions = {}
 
-SCANNER_BASE_URL = "https://roziyevbehroz-tech.github.io/lessonlab-scanner"
+SCANNER_BASE_URL = "https://roziyevbehroz-tech.github.io/lessonlab-scanner/scanner"
 
 class ScannerSession(StatesGroup):
     selecting_class = State()
