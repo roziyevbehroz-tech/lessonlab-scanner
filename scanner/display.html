@@ -536,7 +536,7 @@
             transform: scale(1.1);
             box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
         }
-    
+
         /* --- SIDEBAR --- */
         #responses-sidebar {
             position: fixed;
@@ -552,14 +552,16 @@
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
         }
+
         #responses-sidebar.open {
             transform: translateX(0);
         }
+
         .sidebar-header {
             padding: 2rem;
-            border-bottom: 2px solid rgba(255,255,255,0.05);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -567,6 +569,7 @@
             font-weight: 800;
             color: #fff;
         }
+
         .sidebar-list {
             flex: 1;
             overflow-y: auto;
@@ -575,9 +578,16 @@
             flex-direction: column;
             gap: 1rem;
         }
-        .sidebar-list::-webkit-scrollbar { width: 5px; }
-        .sidebar-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 5px; }
-        
+
+        .sidebar-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
         .sidebar-item {
             background: rgba(255, 255, 255, 0.05);
             padding: 1.5rem;
@@ -589,11 +599,12 @@
             justify-content: center;
             transition: 0.3s;
         }
+
         .sidebar-item.answered {
             background: rgba(16, 185, 129, 0.15);
             color: #fff;
             border: 1px solid var(--success);
-            box-shadow: 0 0 15px rgba(16,185,129,0.3);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
         }
 
         /* --- TOGGLE SWITCH --- */
@@ -604,26 +615,44 @@
             height: 28px;
             margin-left: 15px;
         }
-        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background-color: #334155;
             transition: .4s;
             border-radius: 34px;
         }
+
         .slider:before {
             position: absolute;
             content: "";
-            height: 20px; width: 20px;
-            left: 4px; bottom: 4px;
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
         }
-        input:checked + .slider { background-color: var(--success); }
-        input:checked + .slider:before { transform: translateX(22px); }
+
+        input:checked+.slider {
+            background-color: var(--success);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(22px);
+        }
 
         /* --- POST-QUESTION RESULTS SCREEN --- */
         #screen-question-results {
@@ -634,6 +663,7 @@
             max-width: 1700px;
             margin: 0 auto;
         }
+
         .accuracy-bar-container {
             width: 100%;
             background: var(--danger);
@@ -641,10 +671,11 @@
             border-radius: 20px;
             margin-bottom: 4rem;
             position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
             display: flex;
             align-items: center;
         }
+
         .accuracy-fill {
             height: 100%;
             background: var(--success);
@@ -652,6 +683,7 @@
             transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
         }
+
         .accuracy-badge {
             position: absolute;
             left: 50%;
@@ -663,9 +695,10 @@
             font-weight: 900;
             padding: 1rem 2rem;
             border-radius: 30px;
-            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
             z-index: 2;
         }
+
         .accuracy-labels {
             position: absolute;
             width: 100%;
@@ -677,46 +710,57 @@
             color: #fff;
             pointer-events: none;
         }
-        
+
         .results-main-layout {
             display: flex;
             width: 100%;
             gap: 4rem;
         }
+
         .results-left {
             flex: 2;
             background: var(--bg-card);
             border-radius: 2rem;
             padding: 3rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
+
         .results-question-text {
             font-size: 2.5rem;
             font-weight: 800;
             margin-bottom: 3rem;
-            border-bottom: 2px solid rgba(255,255,255,0.1);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
             padding-bottom: 2rem;
         }
+
         .results-option-row {
             display: flex;
             align-items: center;
             margin-bottom: 2rem;
             gap: 2rem;
         }
+
         .results-badge {
-            width: 50px; height: 50px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 2rem; font-weight: 800;
-            background: #334155; color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 800;
+            background: #334155;
+            color: #fff;
         }
+
         .results-bar-wrap {
             flex: 1;
             height: 30px;
-            background: rgba(0,0,0,0.3);
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 15px;
             position: relative;
         }
+
         .results-bar-fill {
             height: 100%;
             background: var(--danger);
@@ -724,9 +768,11 @@
             transition: width 1s ease-out;
             width: 0%;
         }
+
         .results-bar-fill.correct {
             background: var(--success);
         }
+
         .results-count {
             font-size: 2rem;
             font-weight: 900;
@@ -736,12 +782,13 @@
 
         .results-right {
             flex: 1;
-            background: rgba(0,0,0,0.4);
+            background: rgba(0, 0, 0, 0.4);
             border-radius: 2rem;
             padding: 2rem;
             display: flex;
             flex-direction: column;
         }
+
         .mini-leaderboard-title {
             font-size: 2rem;
             font-weight: 800;
@@ -749,24 +796,33 @@
             display: flex;
             justify-content: space-between;
             color: var(--text-muted);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-bottom: 1rem;
         }
+
         .mini-rank-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 1.5rem;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 1rem;
             margin-bottom: 1rem;
             font-size: 1.8rem;
             font-weight: 700;
         }
-        .mini-rank-item:nth-child(1) { border-left: 4px solid #fbbf24; }
-        .mini-rank-item:nth-child(2) { border-left: 4px solid #94a3b8; }
-        .mini-rank-item:nth-child(3) { border-left: 4px solid #b45309; }
 
+        .mini-rank-item:nth-child(1) {
+            border-left: 4px solid #fbbf24;
+        }
+
+        .mini-rank-item:nth-child(2) {
+            border-left: 4px solid #94a3b8;
+        }
+
+        .mini-rank-item:nth-child(3) {
+            border-left: 4px solid #b45309;
+        }
     </style>
 </head>
 
@@ -779,9 +835,11 @@
         <div class="timer-fill" id="timer-fill"></div>
     </div>
 
-        <div class="top-bar">
+    <div class="top-bar">
         <div class="title" style="display:flex; align-items:center; gap:20px;">
-            <div id="top-question-badge" style="background:#1e293b; padding:10px 20px; border-radius:15px; font-size:1.8rem; color:#fff; border:1px solid rgba(255,255,255,0.1);">Question -/-</div>
+            <div id="top-question-badge"
+                style="background:#1e293b; padding:10px 20px; border-radius:15px; font-size:1.8rem; color:#fff; border:1px solid rgba(255,255,255,0.1);">
+                Question -/-</div>
             <div style="font-size: 1.8rem; display:flex; align-items:center; color:#fff; font-weight:700;">
                 Show student responses
                 <label class="switch">
@@ -790,7 +848,8 @@
                 </label>
             </div>
         </div>
-        <div class="status" id="connection-status"><i class="fa-solid fa-wifi" style="color:var(--warning)"></i> Kutilyapti</div>
+        <div class="status" id="connection-status"><i class="fa-solid fa-wifi" style="color:var(--warning)"></i>
+            Kutilyapti</div>
     </div>
 
     <!-- LOBBY SCREEN -->
@@ -823,7 +882,7 @@
         </div>
     </div>
 
-        <!-- SIDEBAR -->
+    <!-- SIDEBAR -->
     <div id="responses-sidebar">
         <div class="sidebar-header">
             <span>Responses</span>
@@ -836,9 +895,10 @@
 
     <!-- POST-QUESTION RESULTS SCREEN -->
     <div id="screen-question-results" class="screen">
-        
+
         <div style="width:100%; text-align:center; margin-bottom: 2rem;">
-            <div style="display:inline-block; background:rgba(255,255,255,0.1); padding:1rem 3rem; border-radius:30px; font-size:2rem; font-weight:800;">
+            <div
+                style="display:inline-block; background:rgba(255,255,255,0.1); padding:1rem 3rem; border-radius:30px; font-size:2rem; font-weight:800;">
                 <i class="fa-solid fa-users"></i> <span id="results-total-responses">0 responses collected</span>
             </div>
         </div>
@@ -918,20 +978,20 @@
         const loadingStr = document.getElementById('loading');
 
         // --- Added Logic for Sidebar and Result Screen ---
-        document.getElementById('toggle-sidebar').addEventListener('change', function(e) {
+        document.getElementById('toggle-sidebar').addEventListener('change', function (e) {
             const sidebar = document.getElementById('responses-sidebar');
-            if(e.target.checked) sidebar.classList.add('open');
+            if (e.target.checked) sidebar.classList.add('open');
             else sidebar.classList.remove('open');
         });
 
         function updateSidebar() {
             const list = document.getElementById('sidebar-list');
-            const sortedStudents = Object.values(students).sort((a,b) => a.id - b.id);
+            const sortedStudents = Object.values(students).sort((a, b) => a.id - b.id);
             let html = '';
             let answeredCount = 0;
             sortedStudents.forEach(st => {
                 const isAns = studentAnswersCurrent[st.id] !== undefined;
-                if(isAns) answeredCount++;
+                if (isAns) answeredCount++;
                 html += `<div class="sidebar-item ${isAns ? 'answered' : ''}">P${st.remote_id || st.id}</div>`;
             });
             list.innerHTML = html;
@@ -941,27 +1001,27 @@
         function showQuestionResults() {
             clearInterval(timerInterval);
             document.getElementById('timer-fill').style.transform = 'scaleX(0)';
-            
+
             showScreen('question-results');
-            
+
             const q = questions[currentQuestionIndex];
             document.getElementById('res-q-text').innerText = `${currentQuestionIndex + 1}. ${q.text}`;
-            
+
             // Calculate votes
             let totalVotes = 0;
             let correctVotes = 0;
             let optionCounts = [0, 0, 0, 0];
-            
+
             Object.values(studentAnswersCurrent).forEach(ansIdx => {
                 totalVotes++;
-                if(ansIdx >= 0 && ansIdx <= 3) {
+                if (ansIdx >= 0 && ansIdx <= 3) {
                     optionCounts[ansIdx]++;
-                    if(ansIdx === q.correct) correctVotes++;
+                    if (ansIdx === q.correct) correctVotes++;
                 }
             });
-            
+
             document.getElementById('results-total-responses').innerText = `${totalVotes} responses collected`;
-            
+
             // Accuracy Bar
             const accuracy = totalVotes > 0 ? Math.round((correctVotes / totalVotes) * 100) : 0;
             setTimeout(() => {
@@ -970,7 +1030,7 @@
             document.getElementById('res-accuracy-badge').innerText = `${accuracy}% Accuracy`;
             document.getElementById('res-correct-pts').innerText = `${correctVotes} pts`;
             document.getElementById('res-wrong-pts').innerText = `${totalVotes - correctVotes} pts`;
-            
+
             // Option Bars
             let optsHtml = '';
             const labels = ['A', 'B', 'C', 'D'];
@@ -978,7 +1038,7 @@
                 const count = optionCounts[idx];
                 const pct = totalVotes > 0 ? (count / totalVotes) * 100 : 0;
                 const isCorrect = (idx === q.correct);
-                
+
                 optsHtml += `
                     <div class="results-option-row">
                         <div class="results-badge" style="background: ${isCorrect ? 'var(--success)' : 'rgba(255,255,255,0.1)'}">${labels[idx]}</div>
@@ -993,14 +1053,14 @@
                 `;
             });
             document.getElementById('res-options-container').innerHTML = optsHtml;
-            
+
             // Mini Leaderboard
             const sorted = Object.values(students).sort((a, b) => studentScores[b.id] - studentScores[a.id]);
             let miniHtml = '';
             sorted.slice(0, 4).forEach((st, idx) => {
                 miniHtml += `
                     <div class="mini-rank-item">
-                        <div style="width:30px; text-align:center;">${idx+1}</div>
+                        <div style="width:30px; text-align:center;">${idx + 1}</div>
                         <div style="flex:1; padding-left:20px;">${st.full_name.split(' ')[0]}</div>
                         <div>${studentScores[st.id]}</div>
                     </div>
@@ -1041,8 +1101,10 @@
                     .single();
                 if (tErr) throw tErr;
                 testData = tData;
-                document.getElementById('test-title-display').innerText = tData.title;
-                document.getElementById('lobby-course-title').innerText = tData.title;
+                const titleDisp = document.getElementById('test-title-display');
+                if (titleDisp) titleDisp.innerText = tData.title;
+                const lobbySub = document.getElementById('lobby-course-title');
+                if (lobbySub) lobbySub.innerText = tData.title;
 
                 // Fetch Questions
                 const { data: qData, error: qErr } = await window.supabaseClient
@@ -1201,7 +1263,7 @@
 
         function showScreen(name) {
             Object.values(screens).forEach(s => s.classList.remove('active'));
-            if(screens[name]) screens[name].classList.add('active');
+            if (screens[name]) screens[name].classList.add('active');
 
             const topTimer = document.getElementById('top-timer-bar');
             if (name !== 'question') {
@@ -1238,7 +1300,8 @@
             const q = questions[currentQuestionIndex];
 
             document.getElementById('question-text').innerText = `${currentQuestionIndex + 1}. ${q.text}`;
-            document.getElementById('top-question-badge').innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
+            const badge = document.getElementById('top-question-badge');
+            if (badge) badge.innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
             updateSidebar();
 
             let optsHtml = '';
