@@ -17,6 +17,9 @@ let port = null;
 let reader = null;
 let readLoopActive = false;
 
+// Kesh uchun chart instansiyasi
+let analyticsChartInstance = null;
+
 
 // ─── TAB ALMASHTIRISH MANTIG'I (SPA Frontend) ───
 function switchTab(tabId, title, navElement) {
@@ -45,9 +48,6 @@ function switchTab(tabId, title, navElement) {
         loadDashboardStats();
     } else if (tabId === 'classes') {
         loadClasses();
-    } else if (tabId === 'tests') {
-        loadTests();
-        loadDictionaries();
     }
 }
 
@@ -67,27 +67,17 @@ async function loadDashboardStats() {
         if (cached) {
             try {
                 const c = JSON.parse(cached);
-                if (c.t !== undefined) document.getElementById('dash-test-count').innerText = c.t;
-                if (c.d !== undefined) document.getElementById('dash-dict-count').innerText = c.d;
                 if (c.c !== undefined) document.getElementById('dash-class-count').innerText = c.c;
                 if (c.s !== undefined) document.getElementById('dash-student-count').innerText = c.s;
+                if (c.recentHtml) document.getElementById('dash-recent-tests').innerHTML = c.recentHtml;
             } catch (e) { }
         }
 
-        // Test count
-        const { count: testCount } = await supabaseClient.from('bot_tests').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
-        document.getElementById('dash-test-count').innerText = testCount || 0;
-
-        // Dict count
-        const { count: dictCount } = await supabaseClient.from('bot_dictionaries').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
-        document.getElementById('dash-dict-count').innerText = dictCount || 0;
-
-        // Class count
+        // 1. Class count
         const { count: classCount } = await supabaseClient.from('bot_classes').select('*', { count: 'exact', head: true }).eq('user_id', currentUserId);
         document.getElementById('dash-class-count').innerText = classCount || 0;
 
-        // Student count
-        // Fetch all classes first
+        // 2. Student count
         const { data: classes } = await supabaseClient.from('bot_classes').select('id').eq('user_id', currentUserId);
         let studentCount = 0;
         if (classes && classes.length > 0) {
@@ -97,8 +87,126 @@ async function loadDashboardStats() {
         }
         document.getElementById('dash-student-count').innerText = studentCount;
 
+        // 3. Recent Sessions
+        const listEl = document.getElementById('dash-recent-tests');
+        const { data: sessions, error } = await supabaseClient
+            .from('bot_group_sessions')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        let recentHtml = '';
+        let chartLabels = [];
+        let chartData = [];
+
+        if (error) {
+            console.error("Sessions error:", error);
+            recentHtml = '<p style="color:red; font-size:12px;">Xatolik yuz berdi</p>';
+        } else if (!sessions || sessions.length === 0) {
+            recentHtml = '<p style="color:var(--hint-color); font-size:13px; margin:0;">Hali o\'tkazilgan testlar yo\'q.</p>';
+        } else {
+            recentHtml = '<ul class="item-list" style="width: 100%;">';
+            // Teskari tartibda (eng eskisi chart boshida chiqishi uchun)
+            const chartSessions = [...sessions].reverse();
+
+            chartSessions.forEach(s => {
+                let pCount = 0;
+                let avgPct = 0;
+                try {
+                    let sc = JSON.parse(s.scores || '{}');
+                    let students = Object.keys(sc);
+                    pCount = students.length;
+
+                    if (pCount > 0) {
+                        let totalPct = 0;
+                        students.forEach(sid => {
+                            let st = sc[sid];
+                            if (st.total > 0) {
+                                totalPct += (st.correct / st.total) * 100;
+                            }
+                        });
+                        avgPct = Math.round(totalPct / pCount);
+                    }
+                } catch (e) { }
+
+                let valDate = new Date(s.created_at);
+                let shortDate = valDate.getDate() + '/' + (valDate.getMonth() + 1);
+
+                chartLabels.push(shortDate);
+                chartData.push(avgPct);
+            });
+
+            sessions.forEach(s => {
+                let pCount = 0;
+                try {
+                    let sc = JSON.parse(s.scores || '{}');
+                    pCount = Object.keys(sc).length;
+                } catch (e) { }
+
+                let dateStr = new Date(s.created_at).toLocaleDateString();
+                let statusIcon = s.status === 'active' ? '🟢' : '⚫';
+                let modeText = 'Guruh Testi';
+                try {
+                    let set = JSON.parse(s.settings || '{}');
+                    if (set.mode === 'qr_scanner') modeText = 'QR Skaner';
+                } catch (e) { }
+
+                recentHtml += `<li style="flex-direction:row; padding: 10px;">
+                                   <div>
+                                       <strong>${statusIcon} ${modeText}</strong><br>
+                                       <span style="font-size:12px; color:var(--hint-color);">${dateStr} • Qo'shilganlar: ${pCount} ta</span>
+                                   </div>
+                               </li>`;
+            });
+            recentHtml += '</ul>';
+        }
+        listEl.innerHTML = recentHtml;
+
+        // CHIZMA YARATISH (CHART.JS)
+        const ctx = document.getElementById('analyticsChart');
+        if (ctx) {
+            if (analyticsChartInstance) {
+                analyticsChartInstance.destroy();
+            }
+            if (chartData.length > 0) {
+                ctx.style.display = 'block';
+                analyticsChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            label: 'O\'rtacha natija (%)',
+                            data: chartData,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#8b5cf6',
+                            pointRadius: 4,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, max: 100 }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            } else {
+                ctx.style.display = 'none';
+            }
+        }
+
         localStorage.setItem('cache_dash_' + currentUserId, JSON.stringify({
-            t: testCount || 0, d: dictCount || 0, c: classCount || 0, s: studentCount
+            c: classCount || 0,
+            s: studentCount,
+            recentHtml: recentHtml
         }));
 
     } catch (err) {
@@ -106,100 +214,7 @@ async function loadDashboardStats() {
     }
 }
 
-async function loadDictionaries() {
-    const listEl = document.getElementById('dicts-list');
-    if (!listEl) return;
 
-    const cachedHtml = localStorage.getItem('cache_dicts_' + currentUserId);
-    if (cachedHtml) {
-        listEl.innerHTML = cachedHtml;
-    } else {
-        listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Lug\'atlar yuklanmoqda...</p>';
-    }
-
-    try {
-        const { data, error } = await supabaseClient
-            .from('bot_dictionaries')
-            .select('*')
-            .eq('user_id', currentUserId)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-            listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Sizda hali lug\'atlar yo\'q.</p>';
-            return;
-        }
-
-        let html = '<ul class="item-list">';
-        data.forEach(dict => {
-            html += `<li>
-                          <span>📕 ${dict.name}</span>
-                          <div>
-                              <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="openDictDetailView(${dict.id}, '${dict.name}')"><i class="fa-solid fa-gear"></i></button>
-                              <button class="btn-sm" style="background:var(--button-color); color:white" onclick="openActionModal(${dict.id}, 'dict')"><i class="fa-solid fa-play"></i></button>
-                          </div>
-                     </li>`;
-        });
-        html += '</ul>';
-        listEl.innerHTML = html;
-        localStorage.setItem('cache_dicts_' + currentUserId, html);
-
-    } catch (err) {
-        console.error("Lug'atlarni yuklashda xato:", err);
-        if (!cachedHtml) {
-            listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
-        }
-    }
-}
-
-async function loadTests() {
-    const listEl = document.getElementById('tests-list');
-    if (!listEl) return;
-
-    const cachedHtml = localStorage.getItem('cache_tests_' + currentUserId);
-    if (cachedHtml) {
-        listEl.innerHTML = cachedHtml;
-    } else {
-        listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Testlar yuklanmoqda...</p>';
-    }
-
-
-    try {
-        const { data, error } = await supabaseClient
-            .from('bot_tests')
-            .select('*')
-            .eq('user_id', currentUserId)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-            listEl.innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Sizda hali testlar yo\'q.</p>';
-            return;
-        }
-
-        let html = '<ul class="item-list">';
-        data.forEach(test => {
-            html += `<li>
-                                            <span>📄 ${test.title}</span>
-                                            <div>
-                                                <button class="btn-sm" style="background:#f3f4f6; color:#374151" onclick="openTestDetailView(${test.id}, '${test.title.replace(/'/g, "\\'")}')"><i class="fa-solid fa-gear"></i></button>
-                                                <button class="btn-sm" style="background:var(--button-color); color:white" onclick="openActionModal(${test.id}, 'test')"><i class="fa-solid fa-play"></i></button>
-                                            </div>
-                                       </li>`;
-        });
-        html += '</ul>';
-        listEl.innerHTML = html;
-        localStorage.setItem('cache_tests_' + currentUserId, html);
-
-    } catch (err) {
-        console.error("Testlarni yuklashda xato:", err);
-        if (!cachedHtml) {
-            listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message || 'Noma\'lum xato'}</p>`;
-        }
-    }
-}
 
 async function loadClasses() {
     const listEl = document.getElementById('classes-list');
@@ -283,14 +298,19 @@ async function loadStudents(classId) {
                 ? `<span style="color:#10b981; font-size:12px; font-weight:600;"><i class="fa-solid fa-satellite-dish"></i> ${student.remote_id}</span>`
                 : `<span style="color:#ef4444; font-size:12px;"><i class="fa-solid fa-triangle-exclamation"></i> Pult ulanmagan</span>`;
 
-            html += `<li>
-                        <div style="display:flex; flex-direction:column; gap:4px;">
+            html += `<li style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
                             <span><b>${student.student_id_in_class}.</b> ${student.full_name}</span>
                             ${remoteText}
                         </div>
-                        <button class="btn-sm" style="background-color: var(--button-color); color: white; border-radius:8px;" onclick="openAssignRemoteModal(${student.id}, '${student.full_name}')">
-                            <i class="fa-solid fa-link"></i> Ulash
-                        </button>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-sm" style="background-color: var(--button-color); color: white; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:10px;" onclick="openAssignRemoteModal(${student.id}, '${student.full_name}')">
+                                <i class="fa-solid fa-link"></i>
+                            </button>
+                            <button class="btn-sm" style="background-color: #f59e0b; color: white; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:10px;" onclick="openStudentAnalytics('${student.full_name}')">
+                                <i class="fa-solid fa-chart-line"></i>
+                            </button>
+                        </div>
                      </li>`;
         });
         html += '</ul>';
@@ -299,6 +319,91 @@ async function loadStudents(classId) {
     } catch (err) {
         console.error("O'quvchilarni yuklashda xato:", err);
         listEl.innerHTML = `<p style="color:red; font-size: 13px; text-align:center;">Xatolik: ${err.message}</p>`;
+    }
+}
+
+// ==========================================
+// CLASS CREATION LOGIC
+// ==========================================
+
+function openCreateClassModal() {
+    document.getElementById('create-class-modal').style.display = 'flex';
+    setTimeout(() => {
+        document.getElementById('create-class-modal').style.opacity = '1';
+    }, 10);
+    document.getElementById('new-class-name').value = '';
+    document.getElementById('new-class-students').value = '';
+    document.getElementById('student-line-count').innerText = '0';
+}
+
+function closeCreateClassModal() {
+    document.getElementById('create-class-modal').style.opacity = '0';
+    setTimeout(() => {
+        document.getElementById('create-class-modal').style.display = 'none';
+        document.getElementById('btn-save-class').innerHTML = '<i class="fa-solid fa-save"></i> Saqlash';
+        document.getElementById('btn-save-class').disabled = false;
+    }, 300);
+}
+
+document.getElementById('new-class-students').addEventListener('input', function () {
+    const lines = this.value.split('\n').filter(line => line.trim() !== '');
+    document.getElementById('student-line-count').innerText = lines.length;
+});
+
+async function saveNewClass() {
+    const className = document.getElementById('new-class-name').value.trim();
+    const studentsText = document.getElementById('new-class-students').value;
+    const studentNames = studentsText.split('\n').map(s => s.trim()).filter(s => s !== '');
+
+    if (!className) {
+        Swal.fire('Xatolik', 'Sinf nomini kiriting!', 'error');
+        return;
+    }
+    if (studentNames.length === 0) {
+        Swal.fire('Xatolik', 'Kamida 1 ta o\'quvchi ismini kiriting!', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-class');
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saqlanmoqda...';
+    btn.disabled = true;
+
+    try {
+        // 1. Insert class
+        const { data: classData, error: classError } = await window.supabaseClient
+            .from('bot_classes')
+            .insert([{ user_id: currentUserId, name: className }])
+            .select();
+
+        if (classError) throw classError;
+        const newClassId = classData[0].id;
+
+        // 2. Insert students
+        const studentInserts = studentNames.map((name, index) => ({
+            class_id: newClassId,
+            student_id_in_class: index + 1,
+            full_name: name,
+            remote_id: null
+        }));
+
+        const { error: studentsError } = await window.supabaseClient
+            .from('bot_students')
+            .insert(studentInserts);
+
+        if (studentsError) throw studentsError;
+
+        closeCreateClassModal();
+        Swal.fire('Muvaffaqiyat!', 'Sinf va o\'quvchilar saqlandi.', 'success');
+
+        // Refresh classes list
+        loadClasses();
+        loadDashboardStats(); // update counters
+
+    } catch (err) {
+        console.error("Sinf saqlashda xato:", err);
+        Swal.fire('Xato', 'Sinfni saqlashda xatolik yuz berdi: ' + (err.message || JSON.stringify(err)), 'error');
+        btn.innerHTML = '<i class="fa-solid fa-save"></i> Saqlash';
+        btn.disabled = false;
     }
 }
 
@@ -457,70 +562,82 @@ async function processAssignmentSignal(signalData) {
 }
 
 // ==========================================
-// TEST / DICTIONARY CREATE MODAL
+// STUDENT ANALYTICS MODAL
 // ==========================================
 
-function openCreateModal(type) {
-    document.getElementById('create-type').value = type;
-    const modal = document.getElementById('create-modal');
-    const titleText = type === 'test' ? 'Yangi Test Qo\'shish' : 'Yangi Lug\'at Qo\'shish';
-    document.getElementById('create-modal-title').innerText = titleText;
-    document.getElementById('create-title-input').value = '';
+async function openStudentAnalytics(studentName) {
+    document.getElementById('analytics-student-name').innerText = studentName;
+    document.getElementById('analytics-tests-count').innerText = "Yuklanmoqda...";
+    document.getElementById('analytics-avg-score').innerText = "...";
+    document.getElementById('analytics-history-list').innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">Tarix yuklanmoqda...</p>';
 
-    // Animate display in
+    const modal = document.getElementById('analytics-modal');
     modal.style.display = 'flex';
     setTimeout(() => modal.style.opacity = '1', 10);
+
+    try {
+        const { data: sessions, error } = await supabaseClient
+            .from('bot_group_sessions')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        let totalScore = 0;
+        let participatedCount = 0;
+        let historyHtml = '<ul class="item-list">';
+
+        if (sessions) {
+            sessions.forEach(s => {
+                let scoresDict = {};
+                try { scoresDict = JSON.parse(s.scores || '{}'); } catch (e) { }
+
+                // If the student participated in this session
+                if (scoresDict[studentName] !== undefined) {
+                    let score = parseInt(scoresDict[studentName]);
+                    totalScore += score;
+                    participatedCount++;
+
+                    let dateStr = new Date(s.created_at).toLocaleDateString();
+                    historyHtml += `<li>
+                                       <span><i class="fa-solid fa-file-signature"></i> Guruh Testi</span>
+                                       <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                                           <span style="font-weight:bold; color:var(--button-color);">${score} ball</span>
+                                           <span style="font-size:11px; color:var(--hint-color);">${dateStr}</span>
+                                       </div>
+                                   </li>`;
+                }
+            });
+        }
+
+        historyHtml += '</ul>';
+
+        document.getElementById('analytics-tests-count').innerText = participatedCount;
+
+        if (participatedCount > 0) {
+            const avg = Math.round(totalScore / participatedCount);
+            document.getElementById('analytics-avg-score').innerText = avg;
+            document.getElementById('analytics-history-list').innerHTML = historyHtml;
+        } else {
+            document.getElementById('analytics-avg-score').innerText = '-';
+            document.getElementById('analytics-history-list').innerHTML = '<p style="color:var(--hint-color); font-size: 13px; text-align: center;">O\'quvchi hali birorta testda qatnashmagan.</p>';
+        }
+
+    } catch (err) {
+        console.error("Analitika yuklashda xato:", err);
+        document.getElementById('analytics-history-list').innerHTML = '<p style="color:red; font-size: 13px; text-align: center;">Xatolik yuz berdi!</p>';
+    }
 }
 
-function closeCreateModal() {
-    const modal = document.getElementById('create-modal');
+function closeStudentAnalytics() {
+    const modal = document.getElementById('analytics-modal');
     modal.style.opacity = '0';
     setTimeout(() => modal.style.display = 'none', 300);
 }
 
-async function submitCreateItem() {
-    const type = document.getElementById('create-type').value;
-    const title = document.getElementById('create-title-input').value.trim();
+// ==========================================
 
-    if (!title) {
-        Swal.fire('Diqqat', 'Iltimos nomni kiriting', 'warning');
-        return;
-    }
-
-    try {
-        let tableName = type === 'test' ? 'bot_tests' : 'bot_dictionaries';
-        let insertData = { user_id: currentUserId };
-
-        if (type === 'test') {
-            insertData.title = title;
-        } else {
-            insertData.name = title;
-        }
-
-        const { error } = await supabaseClient.from(tableName).insert([insertData]);
-
-        if (error) throw error;
-
-        Swal.fire({
-            title: 'Muvaffaqiyatli!',
-            text: 'Muvaffaqiyatli saqlandi',
-            icon: 'success',
-            timer: 1500,
-            showConfirmButton: false
-        });
-
-        closeCreateModal();
-
-        // Refresh lists and dashboard based on where we are
-        if (type === 'test') loadTests();
-        if (type === 'dict') loadDictionaries();
-        loadDashboardStats();
-
-    } catch (err) {
-        console.error("Yaratishda xato:", err);
-        Swal.fire('Xatolik', err.message || 'Saqlash imkonsiz', 'error');
-    }
-}
 
 // ==========================================
 // ACTION MODAL (START TEST / DICT)
@@ -550,16 +667,23 @@ function startAction(actionType) {
 
     closeActionModal();
 
-    // Sends data back to the Telegram Bot via WebApp sendData
-    // The Telegram bot will receive a custom string identifying the action, item, and ID
     const payload = `${actionType}_${itemType}_${itemId}`;
 
-    // Check if we are inside telegram
-    if (tg.initDataUnsafe && tg.initDataUnsafe.query_id) {
-        // We can use sendData if opened via keyboard button (Not inline)
-        tg.sendData(payload);
+    if (window.Telegram && window.Telegram.WebApp) {
+        // Guruh va Ulashish yuborish turlari uchun chat tanlash (Inline Query) ochamiz
+        if (actionType === 'group' || actionType === 'share') {
+            if (window.Telegram.WebApp.switchInlineQuery) {
+                window.Telegram.WebApp.switchInlineQuery(payload, ['groups', 'supergroups']);
+            }
+        } else {
+            // QR, Pult va Private rejimlar uchun joriy chatga (botni o'ziga) inline query tashlaymiz
+            // Ikkinchi argumentni bermasak, bu joriy chatga yozuvni tayyorlab beradi
+            if (window.Telegram.WebApp.switchInlineQuery) {
+                window.Telegram.WebApp.switchInlineQuery(payload);
+            }
+        }
     } else {
-        // Fallback for standalone web view testing
+        // Fallback
         Swal.fire('Harakat Tanlandi', `Botga yuboriladigan buyruq: ${payload}`, 'info');
     }
 }

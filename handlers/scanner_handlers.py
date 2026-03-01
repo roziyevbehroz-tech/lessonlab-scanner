@@ -97,14 +97,15 @@ async def send_scanner_links(message, test_id, class_id=None, user_id=None, cust
     # Generate unique session ID for real-time sync
     session_id = f"llab-{test_id}-{random.randint(1000, 9999)}"
 
+    ct_val = class_id if class_id else 0
     if mode == "remote":
-        scanner_url = f"{SCANNER_BASE_URL}/remote.html?data={encoded}&session={session_id}"
+        scanner_url = f"{SCANNER_BASE_URL}/remote.html?test_id={test_id}&class_id={ct_val}&session={session_id}&data={encoded}"
         scanner_btn_text = "🎛 Pult bilan boshlash (Arduinoga Ulanish)"
     else:
-        scanner_url = f"{SCANNER_BASE_URL}/index.html?data={encoded}&session={session_id}"
+        scanner_url = f"{SCANNER_BASE_URL}/index.html?test_id={test_id}&class_id={ct_val}&session={session_id}&data={encoded}"
         scanner_btn_text = "📱 Skanerni ochish (telefonda)"
 
-    display_url = f"{SCANNER_BASE_URL}/display.html?data={encoded}&session={session_id}&mode={mode}"
+    display_url = f"{SCANNER_BASE_URL}/display.html?test_id={test_id}&class_id={ct_val}&session={session_id}&mode={mode}"
 
     title = test_data['title']
     q_count = len(test_data['questions'])
@@ -181,9 +182,9 @@ async def download_qr_cards(callback: types.CallbackQuery):
     doc = FSInputFile(pdf_path, filename="LLab_Vision_QR_kartalar.pdf")
     await callback.message.answer_document(
         doc,
-        caption="📄 <b>L-Lab Vision — QR kartalar</b>\n\n"
-                "🖨 PDF ni chop eting va o'quvchilarga tarqating.\n"
-                "Har bir karta A/B/C/D javob variantlari bilan.\n"
-                "Jami: 30 ta o'quvchi uchun kartalar.",
+        caption="📄 <b>LessonLab Vision — QR kodli kartalar</b>\n\n"
+                "🖨 PDF A4 formatda.\n"
+                "Har bir karta A/B/C/D javob variantlari bilan.\n\n"
+                "👥 <b>Jami: 40 ta QR kodli kartalar.</b>",
         parse_mode="HTML"
     )

@@ -126,12 +126,71 @@ async def start_private_practice(callback: types.CallbackQuery, state: FSMContex
     await callback.message.edit_text(summary, reply_markup=get_ready_keyboard(), parse_mode="HTML")
 
 @router.callback_query(F.data == "share_test")
-async def share_test_logic(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer("🔗 Ulashish funksiyasi tez orada qo'shiladi!", show_alert=True)
+async def share_test_logic(callback: types.CallbackQuery, state: FSMContext, bot: types.Bot):
+    data = await state.get_data()
+    selected = data.get("selected_tests", [])
+    
+    if not selected:
+        return await callback.answer("⚠️ Iltimos, ulanish uchun testni tanlang!", show_alert=True)
+    
+    if len(selected) > 1:
+        return await callback.answer("⚠️ Hozircha faqat bittadan test ulashish mumkin. Bitta test qoldiring.", show_alert=True)
+        
+    test_id = selected[0]
+    bot_info = await bot.get_me()
+    bot_username = bot_info.username
+    
+    deep_link = f"https://t.me/{bot_username}?start=share_test_{test_id}"
+    
+    await callback.message.edit_text(
+        f"🔗 <b>Ushbu test uchun maxsus havola:</b>\n\n"
+        f"<code>{deep_link}</code>\n\n"
+        f"<i>Havoladan nusxa olib hamkasbingizga yuboring. Ular bu havolaga kirib, testdan nusxa (clone) olishlari mumkin bo'ladi.</i>",
+        reply_markup=get_test_action_keyboard(mode="quiz"), parse_mode="HTML"
+    )
 
-@router.callback_query(F.data == "start_group_qr")
+@router.callback_query(F.data == "open_interactive_menu")
+async def open_interactive_menu(callback: types.CallbackQuery):
+    from keyboards import get_interactive_menu_keyboard
+    await callback.message.edit_text(
+        "🚀 <b>Interaktiv o'yin usulini tanlang:</b>",
+        reply_markup=get_interactive_menu_keyboard(), parse_mode="HTML"
+    )
+
+@router.callback_query(F.data == "back_to_actions")
+async def back_to_actions(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    settings = data.get("global_settings", {})
+    mode = settings.get("mode", "quiz")
+    selected = data.get("selected_tests", [])
+    count = len(selected)
+    
+    await callback.message.edit_text(
+        f"🚀 <b>Tanlangan {count} ta test bilan nima qilamiz?</b>\n\n"
+        "Kerakli usulni tanlang:",
+        reply_markup=get_test_action_keyboard(mode=mode), parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.in_(["select_class_qr", "select_class_remote"]))
+async def select_class_for_interactive(callback: types.CallbackQuery):
+    method = "qr" if "qr" in callback.data else "remote"
+    classes = db.get_user_classes(callback.from_user.id)
+    
+    if not classes:
+        return await callback.answer("⚠️ Sizda hali sinflar yo'q! L-Lab Vision orqali sinf qo'shing.", show_alert=True)
+        
+    from keyboards import get_class_selection_keyboard
+    method_name = "✨ QR Kod" if method == "qr" else "🎛 Pult"
+    
+    await callback.message.edit_text(
+        f"🏫 <b>{method_name} usuli uchun sinfni tanlang:</b>",
+        reply_markup=get_class_selection_keyboard(classes, method=method), parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("start_qr_"))
 async def group_start_qr_logic(callback: types.CallbackQuery, state: FSMContext):
     from handlers.scanner_handlers import send_scanner_links
+    class_id = int(callback.data.split("_")[2])
     data = await state.get_data()
     selected = data.get("selected_tests", [])
     
@@ -141,11 +200,12 @@ async def group_start_qr_logic(callback: types.CallbackQuery, state: FSMContext)
     await callback.answer()
     # Birinchi tanlangan testni QR scanner bilan ochish
     test_id = selected[0]
-    await send_scanner_links(callback.message, test_id, user_id=callback.from_user.id)
+    await send_scanner_links(callback.message, test_id, user_id=callback.from_user.id, class_id=class_id)
 
-@router.callback_query(F.data == "start_group_remote")
+@router.callback_query(F.data.startswith("start_remote_"))
 async def group_start_remote_logic(callback: types.CallbackQuery, state: FSMContext):
     from handlers.scanner_handlers import send_scanner_links
+    class_id = int(callback.data.split("_")[2])
     data = await state.get_data()
     selected = data.get("selected_tests", [])
     
@@ -155,8 +215,7 @@ async def group_start_remote_logic(callback: types.CallbackQuery, state: FSMCont
     await callback.answer()
     test_id = selected[0]
     
-    await send_scanner_links(callback.message, test_id, user_id=callback.from_user.id, mode="remote")
-
+    await send_scanner_links(callback.message, test_id, user_id=callback.from_user.id, mode="remote", class_id=class_id)
 
 
 @router.callback_query(F.data.startswith("manage_test_"))

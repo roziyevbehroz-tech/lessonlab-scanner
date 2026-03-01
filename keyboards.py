@@ -231,17 +231,33 @@ def get_test_management_keyboard(test_id):
 
 def get_test_action_keyboard(mode="quiz"):
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="📱 Bu testni boshlash", callback_data="start_private"))
+    builder.row(InlineKeyboardButton(text="📱 Shaxsiy ishlash", callback_data="start_private"))
+    builder.row(InlineKeyboardButton(text="👥 Guruhda oddiy test", callback_data="start_group"))
     
-    # Faqat 'quiz' rejimida QR va Pult ko'rinadi
+    # Faqat test moduli 'quiz' bo'lganda interaktiv (QR/Pult) ko'rinadi
     if mode == "quiz":
-        builder.row(InlineKeyboardButton(text="✨ Guruhda QR kodli boshlash", callback_data="start_group_qr"))
-        builder.row(InlineKeyboardButton(text="🎛 Pult bilan boshlash", callback_data="start_group_remote"))
+        builder.row(InlineKeyboardButton(text="🚀 Interaktiv o'yin", callback_data="open_interactive_menu"))
         
-    builder.row(InlineKeyboardButton(text="👥 Guruhda boshlash", callback_data="start_group"))
+    # Tahrirlash (Settings) - hozircha sozlamalarni ochadi (yoki tahrirlash menyusini)
+    builder.row(InlineKeyboardButton(text="⚙️ Tahrirlash / Sozlamalar", callback_data="test_settings_global"))
     builder.row(InlineKeyboardButton(text="🔗 Testni ulashish", callback_data="share_test"))
     builder.row(InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_select"))
     
+    return builder.as_markup()
+
+def get_interactive_menu_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="✨ QR Kod usuli", callback_data="select_class_qr"))
+    builder.row(InlineKeyboardButton(text="🎛 Pult usuli", callback_data="select_class_remote"))
+    builder.row(InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_actions"))
+    return builder.as_markup()
+
+def get_class_selection_keyboard(classes, method="qr"):
+    builder = InlineKeyboardBuilder()
+    for c in classes:
+        # callback: start_qr_12 or start_remote_12. c is a tuple (id, name)
+        builder.row(InlineKeyboardButton(text=f"🏫 {c[1]}", callback_data=f"start_{method}_{c[0]}"))
+    builder.row(InlineKeyboardButton(text="⬅️ Orqaga", callback_data="open_interactive_menu"))
     return builder.as_markup()
 
 def get_ready_keyboard():

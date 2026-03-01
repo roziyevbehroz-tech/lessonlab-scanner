@@ -430,3 +430,62 @@ class Database:
             cur.execute("SELECT name FROM bot_dictionaries WHERE id=%s", (dict_id,))
             row = cur.fetchone()
             return row[0] if row else "Noma'lum"
+
+    # === Sharing & Cloning (Phase 8) ===
+    def clone_test(self, test_id, new_user_id):
+        """Duplicates a test, its questions, and options for a new user."""
+        self._ensure_connection()
+        try:
+            with self.conn.cursor() as cur:
+                # 1. Fetch original test details
+                cur.execute("SELECT title, description FROM bot_tests WHERE id=%s", (test_id,))
+                test_row = cur.fetchone()
+                if not test_row:
+                    return None
+                    
+                original_title, original_desc = test_row
+                new_title = f"{original_title} (Nusxa)"
+                
+                # 2. Insert new cloned test
+                cur.execute(
+                    "INSERT INTO bot_tests (user_id, title, description) VALUES (%s, %s, %s) RETURNING id",
+                    (new_user_id, new_title, original_desc)
+                )
+                new_test_id = cur.fetchone()[0]
+                
+                # 3. Fetch original questions
+                cur.execute(
+                    "SELECT id, text, explanation FROM bot_questions WHERE test_id=%s ORDER BY id",
+                    (test_id,)
+                )
+                original_questions = cur.fetchall()
+                
+                for q in original_questions:
+                    old_q_id, q_text, q_expl = q
+                    # 4. Insert cloned question
+                    cur.execute(
+                        "INSERT INTO bot_questions (test_id, text, explanation) VALUES (%s, %s, %s) RETURNING id",
+                        (new_test_id, q_text, q_expl)
+                    )
+                    new_q_id = cur.fetchone()[0]
+                    
+                    # 5. Fetch options for this question
+                    cur.execute(
+                        "SELECT text, is_correct FROM bot_options WHERE question_id=%s ORDER BY id",
+                        (old_q_id,)
+                    )
+                    old_options = cur.fetchall()
+                    
+                    # 6. Insert cloned options
+                    for opt in old_options:
+                        opt_text, is_correct = opt
+                        cur.execute(
+                            "INSERT INTO bot_options (question_id, text, is_correct) VALUES (%s, %s, %s)",
+                            (new_q_id, opt_text, is_correct)
+                        )
+                # Commit is handled automatically by autocommit=True, but psycopg2 without it would need self.conn.commit()
+                # Our connection setup uses autocommit=True by default for this bot logic.
+            return new_test_id
+        except Exception as e:
+            print(f"[DB] Error cloning test: {e}")
+            return None

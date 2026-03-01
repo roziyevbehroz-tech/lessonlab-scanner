@@ -47,19 +47,95 @@ file_handler = FileHandler()
 main_router = Router() # Created main_router
 
 # === /start (faqat shaxsiy chat) ===
+from aiogram.filters import CommandObject
 @main_router.message(Command("start"), F.chat.type == "private") # Registered on main_router
-async def cmd_start(message: types.Message, state: FSMContext):
+async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
     await state.clear()
+    user_id = message.from_user.id
     db.update_user_activity(
-        user_id=message.from_user.id,
+        user_id=user_id,
         full_name=message.from_user.full_name,
         username=message.from_user.username
     )
+    
+    args = command.args
+    if args and args.startswith("share_test_"):
+        # 1. Parse Test ID
+        try:
+            test_id = int(args.split("_")[2])
+        except ValueError:
+            return await message.answer("❌ Noto'g'ri havola!")
+            
+        # 2. Check source
+        source_title = db.get_test_title(test_id)
+        if not source_title or source_title == "Noma'lum":
+            return await message.answer("❌ Kechirasiz, bu test o'chirilgan yoki topilmadi.")
+            
+        await message.answer(f"⏳ <b>{source_title}</b> testi sizning bazangizga nusxalanmoqda...", parse_mode="HTML")
+        
+        # 3. Execute Clone
+        new_test_id = db.clone_test(test_id, user_id)
+        
+        if new_test_id:
+            # 4. Success -> Show Test Actions
+            from keyboards import get_test_action_keyboard
+            await state.update_data(selected_tests=[new_test_id])
+            
+            await message.answer(
+                f"✅ <b>Test muvaffaqiyatli saqlandi!</b>\n\n"
+                f"Siz endi bu testni o'z o'quvchilaringiz bilan ishlatishingiz mumkin. Nima qilamiz?",
+                reply_markup=get_test_action_keyboard(mode="quiz"),
+                parse_mode="HTML"
+            )
+            return
+        else:
+            return await message.answer("❌ Testni nusxalashda xatolik yuz berdi. Iltimos keyinroq urinib ko'ring.")
+
+    # Normal Start
     await message.answer(
         f"✨ 👋 Assalomu alaykum, <b>{message.from_user.full_name}</b>!\n\n",
         reply_markup=main_menu,
         parse_mode="HTML"
     )
+
+# === INLINE QUERY HANDLER (MiniApp Action Integration) ===
+import re
+from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
+
+@main_router.inline_query(lambda query: re.match(r"^(private|qr|remote|group|share)_(test|dict)_(\d+)$", query.query))
+async def inline_miniapp_action_handler(inline_query: types.InlineQuery):
+    user_id = inline_query.from_user.id
+    query_text = inline_query.query
+    parts = query_text.split('_')
+    
+    if len(parts) != 3:
+        return await inline_query.answer([], cache_time=1)
+        
+    action_type, item_type, item_id = parts
+    
+    # Format a nice title
+    action_names = {
+        'private': 'Yakkaxon (Private)',
+        'qr': 'Guruhda QR Bilim',
+        'remote': 'Guruxda PULT bilan',
+        'group': 'Odatiy Guruh (Poll)',
+        'share': 'Ulashish'
+    }
+    
+    item_names = {'test': 'Testni', 'dict': 'Lug\'atni'}
+    title = f"🚀 {item_names.get(item_type, 'Itemni')} {action_names.get(action_type, action_type)} boshlash"
+    
+    trigger_text = f"⏳ Boshlanmoqda...\n[MINIAPP_ACTION:{query_text}]"
+    
+    result = InlineQueryResultArticle(
+        id=f"action_{query_text}",
+        title=title,
+        description=f"Ushbu harakatni tasdiqlash uchun ustiga bosing",
+        input_message_content=InputTextMessageContent(message_text=trigger_text)
+    )
+    await inline_query.answer([result], cache_time=1, is_personal=True)
+
+
 
 # === INLINE QUERY HANDLER (guruhga test yuborish) ===
 @main_router.inline_query(F.query.startswith("grouptest_")) # Registered on main_router
@@ -269,63 +345,6 @@ async def handle_scanner_data(message: types.Message):
         raw = message.web_app_data.data
         print(f"[SCANNER/MINIAPP] Received web_app_data ({len(raw)} bytes): {raw[:200]}")
         
-        # 1. Check if it's a direct action string from MiniApp (e.g., "qr_test_12")
-        if not raw.startswith("{"):
-            parts = raw.split('_')
-            if len(parts) >= 3:
-                action_type = parts[0] # private, qr, remote, group, share, homework, pdf
-                item_type = parts[1]   # test, dict
-                item_id = int(parts[2])
-                
-                # Fetch FSM context to set the selected items
-                state = dp.fsm.resolve_context(bot, message.chat.id, message.from_user.id)
-                
-                if item_type == 'test':
-                    await state.update_data(selected_tests=[item_id])
-                elif item_type == 'dict':
-                    await state.update_data(selected_dicts=[item_id])
-
-                # Mappings to existing callbacks
-                if action_type == 'private':
-                    if item_type == 'test':
-                        from handlers.test_handlers import start_private_practice
-                        await start_private_practice(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_private", json=""), state)
-                    elif item_type == 'dict':
-                        from handlers.quiz_handlers import start_dict_test_summary
-                        await start_dict_test_summary(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_private_dict", json=""), state)
-                
-                elif action_type == 'qr':
-                    if item_type == 'test':
-                        from handlers.test_handlers import group_start_qr_logic
-                        await group_start_qr_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group_qr", json=""), state)
-                    elif item_type == 'dict':
-                        from handlers.quiz_handlers import start_group_qr_dict_logic
-                        await start_group_qr_dict_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group_qr_dict", json=""), state)
-                
-                elif action_type == 'remote':
-                    if item_type == 'test':
-                        from handlers.test_handlers import group_start_remote_logic
-                        await group_start_remote_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group_remote", json=""), state)
-                    elif item_type == 'dict':
-                        from handlers.quiz_handlers import start_group_remote_dict_logic
-                        await start_group_remote_dict_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group_remote_dict", json=""), state)
-                        
-                elif action_type == 'group':
-                    if item_type == 'test':
-                        from handlers.test_handlers import group_start_logic
-                        await group_start_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group", json=""), state)
-                    elif item_type == 'dict':
-                        from handlers.quiz_handlers import start_group_dict_logic
-                        await start_group_dict_logic(types.CallbackQuery(id="0", from_user=message.from_user, message=message, chat_instance="0", data="start_group_dict", json=""), state)
-
-                elif action_type == 'share':
-                    await message.answer("🔗 Ulashish funksiyasi tez orada alohida ishga tushadi.")
-                    
-                else:
-                    await message.answer(f"⏳ MiniApp dan buyruq qabul qilindi: {action_type} - {item_type} (#{item_id})\nUshbu xususiyat hali backendga ulanmagan.")
-                    
-                return
-
         # 2. Otherwise handle as Scanner JSON Result
         data = json.loads(raw)
         action = data.get("action", "") or data.get("a", "")
@@ -632,19 +651,7 @@ async def setup_bot_commands(bot: Bot):
         )
     )
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await message.answer(
-        "👋 Assalomu alaykum! L-Lab Bot ga xush kelibsiz.\n\n"
-        "Quyidagi L-Lab Vision tugmasi orqali asosiy platformaga kiring:",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=[[KeyboardButton(
-                text="🌟 L-Lab Vision", 
-                web_app=WebAppInfo(url="https://roziyevbehroz-tech.github.io/lessonlab-scanner/miniapp/index.html?v=1.1")
-            )]],
-            resize_keyboard=True
-        )
-    )
+
 
 # === BOT STARTUP ===
 async def main():

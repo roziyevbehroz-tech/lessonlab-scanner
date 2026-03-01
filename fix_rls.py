@@ -1,36 +1,33 @@
+import psycopg2
 import os
 from dotenv import load_dotenv
-import psycopg2
 
-load_dotenv()
+def main():
+    load_dotenv()
+    db_url = os.getenv("SUPABASE_DB_URL")
+    if not db_url:
+        print("No SUPABASE_DB_URL found")
+        return
 
-db_url = os.getenv("SUPABASE_DB_URL")
-if not db_url:
-    print("No DB URL")
-    exit(1)
+    try:
+        conn = psycopg2.connect(db_url)
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            # Grant USAGE on sequences needed for inserting into bot_classes and bot_students
+            cur.execute("GRANT USAGE, SELECT ON SEQUENCE bot_classes_id_seq TO anon;")
+            cur.execute("GRANT USAGE, SELECT ON SEQUENCE bot_students_id_seq TO anon;")
+            cur.execute("GRANT USAGE, SELECT ON SEQUENCE bot_classes_id_seq TO authenticated;")
+            cur.execute("GRANT USAGE, SELECT ON SEQUENCE bot_students_id_seq TO authenticated;")
+            
+            # Just to be safe, grant all sequences
+            cur.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;")
+            
+            # Also ensure insert permissions
+            cur.execute("GRANT INSERT, SELECT, UPDATE ON ALL TABLES IN SCHEMA public TO anon, authenticated;")
+            
+            print("Successfully updated permissions for anon role on sequences & tables.")
+    except Exception as e:
+        print("Error:", e)
 
-try:
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = True
-    cur = conn.cursor()
-
-    tables = [
-        "bot_tests", 
-        "bot_questions", 
-        "bot_options", 
-        "bot_dictionaries", 
-        "bot_dictionary_words", 
-        "bot_classes", 
-        "bot_students"
-    ]
-
-    for table in tables:
-        print(f"Fixing RLS for {table}...")
-        cur.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
-        cur.execute(f"DROP POLICY IF EXISTS \"Allow all\" ON {table};")
-        cur.execute(f"CREATE POLICY \"Allow all\" ON {table} FOR ALL USING (true) WITH CHECK (true);")
-    
-    print("Done!")
-
-except Exception as e:
-    print(f"Error: {e}")
+if __name__ == "__main__":
+    main()
