@@ -335,9 +335,17 @@
             if (capabilities.zoom) {
                 currentZoom = Math.min(maxZoom, currentZoom + 0.5);
                 track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-                document.getElementById('zoomLevelIndicator').textContent = currentZoom.toFixed(1) + 'x';
+            } else {
+                throw new Error("No native zoom");
             }
-        } catch (e) { }
+        } catch (e) {
+            // Fallback to CSS digital zoom
+            maxZoom = 4;
+            currentZoom = Math.min(maxZoom, currentZoom + 0.5);
+            document.getElementById('videoInput').style.transform = 'scale(' + currentZoom + ')';
+            document.getElementById('canvasOutput').style.transform = 'scale(' + currentZoom + ')';
+        }
+        document.getElementById('zoomLevelIndicator').textContent = currentZoom.toFixed(1) + 'x';
     });
 
     document.getElementById('btnZoomOut').addEventListener('click', function () {
@@ -348,9 +356,16 @@
             if (capabilities.zoom) {
                 currentZoom = Math.max(minZoom, currentZoom - 0.5);
                 track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-                document.getElementById('zoomLevelIndicator').textContent = currentZoom.toFixed(1) + 'x';
+            } else {
+                throw new Error("No native zoom");
             }
-        } catch (e) { }
+        } catch (e) {
+            // Fallback to CSS digital zoom
+            currentZoom = Math.max(minZoom, currentZoom - 0.5);
+            document.getElementById('videoInput').style.transform = 'scale(' + currentZoom + ')';
+            document.getElementById('canvasOutput').style.transform = 'scale(' + currentZoom + ')';
+        }
+        document.getElementById('zoomLevelIndicator').textContent = currentZoom.toFixed(1) + 'x';
     });
 
     document.getElementById('btnFlipCam').addEventListener('click', function () {
@@ -498,15 +513,7 @@
                 };
 
                 // Play sound! Beep
-                try {
-                    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    var osc = audioCtx.createOscillator();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(isCorrect ? 800 : 300, audioCtx.currentTime);
-                    osc.connect(audioCtx.destination);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.1);
-                } catch (e) { }
+                // Ovoz o'chirildi - foydalanuvchi talabiga binoan
 
                 if (navigator.vibrate) navigator.vibrate(50);
 
@@ -521,9 +528,14 @@
             var isLckCorrect = lckAns === correctAns;
 
             // DRAW Wayground Style Floating Badge
-            // DRAW Wayground Style Floating Badge
             var textAns = lckAns ? lckAns : rawAns;
-            var textBody = stud.name.split(' ')[0]; // short name or P number
+            var textBody = "";
+            var pName = "P " + (m.id + 1);
+            if (stud.name && stud.name !== pName) {
+                textBody = stud.name.split(' ')[0] + " " + (m.id + 1);
+            } else {
+                textBody = pName;
+            }
 
             ctx.font = 'bold 14px sans-serif';
             var ansWidth = 26; // Width of the colored square
