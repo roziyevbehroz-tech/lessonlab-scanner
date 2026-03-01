@@ -995,7 +995,8 @@
                 html += `<div class="sidebar-item ${isAns ? 'answered' : ''}">P${st.remote_id || st.id}</div>`;
             });
             list.innerHTML = html;
-            document.getElementById('sidebar-count').innerText = `${answeredCount}/${sortedStudents.length}`;
+            const _el_sidebar_count = document.getElementById('sidebar-count');
+            if (_el_sidebar_count) _el_sidebar_count.innerText = `${answeredCount}/${sortedStudents.length}`;
         }
 
         function showQuestionResults() {
@@ -1005,7 +1006,8 @@
             showScreen('question-results');
 
             const q = questions[currentQuestionIndex];
-            document.getElementById('res-q-text').innerText = `${currentQuestionIndex + 1}. ${q.text}`;
+            const _el_res_q_text = document.getElementById('res-q-text');
+            if (_el_res_q_text) _el_res_q_text.innerText = `${currentQuestionIndex + 1}. ${q.text}`;
 
             // Calculate votes
             let totalVotes = 0;
@@ -1020,16 +1022,20 @@
                 }
             });
 
-            document.getElementById('results-total-responses').innerText = `${totalVotes} responses collected`;
+            const _el_results_total_responses = document.getElementById('results-total-responses');
+            if (_el_results_total_responses) _el_results_total_responses.innerText = `${totalVotes} responses collected`;
 
             // Accuracy Bar
             const accuracy = totalVotes > 0 ? Math.round((correctVotes / totalVotes) * 100) : 0;
             setTimeout(() => {
                 document.getElementById('res-accuracy-fill').style.width = `${accuracy}%`;
             }, 100);
-            document.getElementById('res-accuracy-badge').innerText = `${accuracy}% Accuracy`;
-            document.getElementById('res-correct-pts').innerText = `${correctVotes} pts`;
-            document.getElementById('res-wrong-pts').innerText = `${totalVotes - correctVotes} pts`;
+            const _el_res_accuracy_badge = document.getElementById('res-accuracy-badge');
+            if (_el_res_accuracy_badge) _el_res_accuracy_badge.innerText = `${accuracy}% Accuracy`;
+            const _el_res_correct_pts = document.getElementById('res-correct-pts');
+            if (_el_res_correct_pts) _el_res_correct_pts.innerText = `${correctVotes} pts`;
+            const _el_res_wrong_pts = document.getElementById('res-wrong-pts');
+            if (_el_res_wrong_pts) _el_res_wrong_pts.innerText = `${totalVotes - correctVotes} pts`;
 
             // Option Bars
             let optsHtml = '';
@@ -1052,7 +1058,8 @@
                     </div>
                 `;
             });
-            document.getElementById('res-options-container').innerHTML = optsHtml;
+            const _elH_res_options_container = document.getElementById('res-options-container');
+            if (_elH_res_options_container) _elH_res_options_container.innerHTML = optsHtml;
 
             // Mini Leaderboard
             const sorted = Object.values(students).sort((a, b) => studentScores[b.id] - studentScores[a.id]);
@@ -1066,7 +1073,8 @@
                     </div>
                 `;
             });
-            document.getElementById('res-mini-leaderboard').innerHTML = miniHtml;
+            const _elH_res_mini_leaderboard = document.getElementById('res-mini-leaderboard');
+            if (_elH_res_mini_leaderboard) _elH_res_mini_leaderboard.innerHTML = miniHtml;
         }
 
 
@@ -1279,7 +1287,8 @@
             let html = '';
             // Determine total students roughly for sub-title if wanted
             const totalStudents = Object.keys(students).length;
-            document.querySelector('.lobby-subtitle').innerHTML = `<i class="fa-solid fa-users"></i> ${totalStudents} o'quvchi kutilmoqda! QR kartalarni tayyorlang...`;
+            const _elHSel_lobbysubtitle = document.querySelector('.lobby-subtitle');
+            if (_elHSel_lobbysubtitle) _elHSel_lobbysubtitle.innerHTML = `<i class="fa-solid fa-users"></i> ${totalStudents} o'quvchi kutilmoqda! QR kartalarni tayyorlang...`;
 
             Object.values(students).forEach(st => {
                 html += `<div class="student-card" id="lobby-card-${st.id}">
@@ -1299,7 +1308,8 @@
             if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) return;
             const q = questions[currentQuestionIndex];
 
-            document.getElementById('question-text').innerText = `${currentQuestionIndex + 1}. ${q.text}`;
+            const _el_question_text = document.getElementById('question-text');
+            if (_el_question_text) _el_question_text.innerText = `${currentQuestionIndex + 1}. ${q.text}`;
             const badge = document.getElementById('top-question-badge');
             if (badge) badge.innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
             updateSidebar();
@@ -1314,7 +1324,8 @@
                     </div>
                 `;
             });
-            document.getElementById('options-grid').innerHTML = optsHtml;
+            const _elH_options_grid = document.getElementById('options-grid');
+            if (_elH_options_grid) _elH_options_grid.innerHTML = optsHtml;
 
             // Populate Live Students Bar
             const trackerBar = document.getElementById('live-students-bar');
@@ -1359,7 +1370,8 @@
                     </div>
                 `;
             });
-            document.getElementById('rankings-list').innerHTML = html;
+            const _elH_rankings_list = document.getElementById('rankings-list');
+            if (_elH_rankings_list) _elH_rankings_list.innerHTML = html;
 
             confetti({ particleCount: 200, spread: 120, origin: { y: 0.5 } });
             setTimeout(() => { confetti({ particleCount: 100, spread: 100, angle: 60, origin: { x: 0 } }); }, 500);
