@@ -506,8 +506,8 @@ html {
    ============================================ */
 .wg-zoom-controls {
     position: absolute;
-    bottom: 100px;
-    right: 20px;
+    top: 20px;
+    left: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -614,6 +614,35 @@ html {
     display: flex;
     align-items: center;
     gap: 8px;
+    cursor: pointer;
+}
+
+.scanned-student-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 500;
+}
+
+.scanned-student-row .ans {
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.scanned-student-row .ans.correct {
+    background: #1e3a24;
+    color: #22c55e;
+}
+
+.scanned-student-row .ans.wrong {
+    background: #3d1c1c;
+    color: #ef4444;
 }
 
 .action-btn {

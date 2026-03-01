@@ -250,12 +250,27 @@
 
     function refreshScannedUI() {
         var count = 0;
+        var listHtml = "";
 
-        for (var mid in currentScanResults) {
+        // Sort by time usually, or just iterate
+        var entries = Object.values(currentScanResults).sort((a, b) => b.time - a.time);
+
+        for (var i = 0; i < entries.length; i++) {
             count++;
+            var res = entries[i];
+            var ansClass = res.isCorrect ? "correct" : "wrong";
+            listHtml += `<div class="scanned-student-row">
+                <span>${res.name}</span>
+                <span class="ans ${ansClass}">${res.answer}</span>
+            </div>`;
         }
 
         document.getElementById('sheet-scanned-count').textContent = count;
+
+        var listContainer = document.getElementById('scanned-students-list');
+        if (listContainer) {
+            listContainer.innerHTML = listHtml;
+        }
 
         var btnSubmit = document.getElementById('btnSubmitScans');
         btnSubmit.disabled = (count === 0);
@@ -676,6 +691,37 @@
             btn.textContent = 'Qaytadan urinish';
         }
     });
+
+    // ─── UI TOGGLES ───
+    var drawerToggle = document.getElementById('drawer-toggle');
+    if (drawerToggle) {
+        drawerToggle.addEventListener('click', function () {
+            var list = document.getElementById('scanned-students-list');
+            var icon = document.getElementById('drawer-icon');
+            if (list.style.display === 'none') {
+                list.style.display = 'flex';
+                icon.className = 'fas fa-chevron-down';
+            } else {
+                list.style.display = 'none';
+                icon.className = 'fas fa-chevron-up';
+            }
+        });
+    }
+
+    var resultsToggle = document.getElementById('toggleDetailedResults');
+    if (resultsToggle) {
+        resultsToggle.addEventListener('click', function () {
+            var container = document.getElementById('results-bars-container');
+            var icon = document.getElementById('results-toggle-icon');
+            if (container.style.display === 'none') {
+                container.style.display = 'flex';
+                icon.className = 'fas fa-chevron-down';
+            } else {
+                container.style.display = 'none';
+                icon.className = 'fas fa-chevron-right'; // Usually hidden means right-facing
+            }
+        });
+    }
 
     // ─── START ───
     initSync();
