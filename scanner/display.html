@@ -66,10 +66,6 @@
         .top-bar .title {
             font-size: clamp(1.5rem, 4vw, 2.5rem);
             font-weight: 900;
-            background: linear-gradient(135deg, #60a5fa, #c084fc);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
         }
 
         .top-bar .status {
@@ -989,7 +985,7 @@
 
         let questionStartTime = 0;
         let timerInterval = null;
-        const totalTimeMs = 30000;
+        let totalTimeMs = 30000;    /* <--- JINOYATCHI YO'Q QILINDI! */
 
         const screens = {
             lobby: document.getElementById('screen-lobby'),
@@ -1188,7 +1184,10 @@
                 console.log("Teacher action:", action, data);
 
                 if (action === 'start' || action === 'next') {
-                    currentQuestionIndex = data; // index defaults to 0 from app.js
+                    // Xatolikni oldini olish uchun raqamni aniq tekshiramiz
+                    let idx = parseInt(data);
+                    if (isNaN(idx)) idx = 0;
+                    currentQuestionIndex = idx;
                     renderQuestion();
                 } else if (action === 'scan_submit') {
                     if (document.getElementById('setting-show-results').checked) {
@@ -1331,14 +1330,27 @@
             const _el_question_text = document.getElementById('question-text');
             const badge = document.getElementById('top-question-badge');
 
-            if (!questions || questions.length === 0) {
-                if (_el_question_text) _el_question_text.innerText = "Xatolik: Ushbu testda hech qanday savol topilmadi. Yoki internet uzildi.";
-                if (badge) badge.innerText = `Question 0/0`;
-                return;
-            }
+            // Xatoliklarni ushlab qoluvchi to'siq
+            if (!questions || questions.length === 0) return;
+            if (currentQuestionIndex == null || isNaN(currentQuestionIndex)) currentQuestionIndex = 0;
+            if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) currentQuestionIndex = 0;
 
-            if (currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) return;
             const q = questions[currentQuestionIndex];
+            if (!q) return;
+
+            // Savolni ekranga yozish (endi bu joygacha bemalol yetib keladi)
+            if (_el_question_text) _el_question_text.innerText = `${currentQuestionIndex + 1}. ${q.text}`;
+            if (badge) badge.innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
+            updateSidebar();
+
+            // ... (qolgan kodlar o'zgarishsiz qoladi)
+
+            // Agar index xato kelsa yoki internet uzilsa, o'zini o'zi tiklaydi
+            if (currentQuestionIndex == null || currentQuestionIndex < 0 || currentQuestionIndex >= questions.length) {
+                currentQuestionIndex = 0;
+            }
+            const q = questions[currentQuestionIndex];
+            if (!q) return; // Agar mutlaqo savol topilmasa, qotib qolmasligi uchun
 
             if (_el_question_text) _el_question_text.innerText = `${currentQuestionIndex + 1}. ${q.text || 'Savol matni yo\'q'}`;
             if (badge) badge.innerText = `Question ${currentQuestionIndex + 1}/${questions.length}`;
