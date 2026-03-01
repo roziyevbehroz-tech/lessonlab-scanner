@@ -355,10 +355,24 @@
 
     document.getElementById('btnFlipCam').addEventListener('click', function () {
         facingMode = (facingMode === 'environment') ? 'user' : 'environment';
+        // Force fully stop camera to switch facing mode
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
         startCamera();
     });
 
     async function startCamera() {
+        if (cameraStream && cameraStream.active) {
+            // Already have an active stream, just re-attach and play
+            isScanning = true;
+            document.getElementById('loadingMessage').style.display = 'block';
+            videoEl.srcObject = cameraStream;
+            videoEl.play();
+            return;
+        }
+
         stopCamera();
         isScanning = true;
         var constraints = { audio: false, video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } } };
@@ -398,9 +412,10 @@
     function stopCamera() {
         isScanning = false;
         if (frameTimer) cancelAnimationFrame(frameTimer);
-        if (cameraStream) {
-            cameraStream.getTracks().forEach(t => t.stop());
-            cameraStream = null;
+        // Do not stop the tracks here so we can reuse the stream.
+        // We will only pause the video element.
+        if (videoEl) {
+            videoEl.pause();
         }
     }
 
@@ -568,7 +583,14 @@
 
     // ─── LEADERBOARD & SAVE ───
     function showLeaderboard() {
-        stopCamera();
+        // Stop completely when showing leaderboard
+        isScanning = false;
+        if (frameTimer) cancelAnimationFrame(frameTimer);
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        if (videoEl) videoEl.pause();
 
         var lb = {};
         if (testData && testData.students) {
