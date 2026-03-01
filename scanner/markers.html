@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>L-Lab Vision — Marker kartalar</title>
+          <style>
+                    /* === SCREEN STYLES === */
+                    * {
+                              margin: 0;
+                              padding: 0;
+                              box-sizing: border-box;
+                    }
+
+                    body {
+                              font-family: 'Segoe UI', Arial, sans-serif;
+                              background: #1a1a2e;
+                              color: #e0e0e0;
+                    }
+
+                    .controls-bar {
+                              position: sticky;
+                              top: 0;
+                              z-index: 100;
+                              background: #16213e;
+                              padding: 16px 24px;
+                              display: flex;
+                              align-items: center;
+                              gap: 16px;
+                              flex-wrap: wrap;
+                              border-bottom: 2px solid #0f3460;
+                    }
+
+                    .controls-bar h2 {
+                              font-size: 18px;
+                              color: #e94560;
+                              margin-right: 12px;
+                    }
+
+                    .controls-bar label {
+                              font-size: 14px;
+                              color: #94a3b8;
+                    }
+
+                    .controls-bar input[type="number"] {
+                              width: 60px;
+                              padding: 6px 10px;
+                              border-radius: 6px;
+                              border: 1px solid #334155;
+                              background: #1e293b;
+                              color: #fff;
+                              font-size: 14px;
+                    }
+
+                    .controls-bar button {
+                              padding: 8px 20px;
+                              border: none;
+                              border-radius: 8px;
+                              font-size: 14px;
+                              font-weight: 600;
+                              cursor: pointer;
+                              transition: all 0.2s;
+                    }
+
+                    .btn-generate {
+                              background: #22c55e;
+                              color: #000;
+                    }
+
+                    .btn-print {
+                              background: #3b82f6;
+                              color: #fff;
+                    }
+
+                    .btn-generate:hover {
+                              background: #16a34a;
+                    }
+
+                    .btn-print:hover {
+                              background: #2563eb;
+                    }
+
+                    .help-text {
+                              font-size: 12px;
+                              color: #64748b;
+                              width: 100%;
+                              margin-top: 4px;
+                    }
+
+                    /* === CARD PREVIEW ON SCREEN === */
+                    .cards-container {
+                              padding: 20px;
+                              display: flex;
+                              flex-wrap: wrap;
+                              gap: 20px;
+                              justify-content: center;
+                    }
+
+                    .card-preview {
+                              width: 280px;
+                              height: 400px;
+                              background: #fff;
+                              border-radius: 8px;
+                              overflow: hidden;
+                              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    }
+
+                    /* === A4 PRINT PAGE === */
+                    .print-page {
+                              width: 210mm;
+                              height: 297mm;
+                              background: #ffffff;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              justify-content: center;
+                              position: relative;
+                              page-break-after: always;
+                              overflow: hidden;
+                    }
+
+                    /* Dashed cutting border */
+                    .cut-border {
+                              position: absolute;
+                              top: 8mm;
+                              left: 8mm;
+                              right: 8mm;
+                              bottom: 8mm;
+                              border: 1.5px dashed #ccc;
+                              border-radius: 4mm;
+                    }
+
+                    /* Scissors icons at cut corners */
+                    .scissors {
+                              position: absolute;
+                              font-size: 12px;
+                              color: #bbb;
+                    }
+
+                    .scissors.top {
+                              top: 5mm;
+                              left: 50%;
+                              transform: translateX(-50%);
+                    }
+
+                    .scissors.bottom {
+                              bottom: 5mm;
+                              left: 50%;
+                              transform: translateX(-50%) rotate(180deg);
+                    }
+
+                    /* Student number in all 4 corners */
+                    .corner-id {
+                              position: absolute;
+                              font-size: 24px;
+                              font-weight: 800;
+                              color: #333;
+                              font-family: 'Arial Black', sans-serif;
+                    }
+
+                    .corner-id.tl {
+                              top: 14mm;
+                              left: 14mm;
+                    }
+
+                    .corner-id.tr {
+                              top: 14mm;
+                              right: 14mm;
+                    }
+
+                    .corner-id.bl {
+                              bottom: 14mm;
+                              left: 14mm;
+                              transform: rotate(180deg);
+                    }
+
+                    .corner-id.br {
+                              bottom: 14mm;
+                              right: 14mm;
+                              transform: rotate(180deg);
+                    }
+
+                    /* Branding text on sides */
+                    .side-brand {
+                              position: absolute;
+                              font-size: 10px;
+                              color: #ccc;
+                              font-weight: 600;
+                              letter-spacing: 3px;
+                              text-transform: uppercase;
+                    }
+
+                    .side-brand.left {
+                              left: 12mm;
+                              top: 50%;
+                              transform: translateY(-50%) rotate(-90deg);
+                    }
+
+                    .side-brand.right {
+                              right: 12mm;
+                              top: 50%;
+                              transform: translateY(-50%) rotate(90deg);
+                    }
+
+                    /* Marker container (centered) */
+                    .marker-area {
+                              position: relative;
+                              display: flex;
+                              flex-direction: column;
+                              align-items: center;
+                              justify-content: center;
+                    }
+
+                    .marker-area canvas {
+                              display: block;
+                    }
+
+                    /* A/B/C/D labels around marker */
+                    .answer-label {
+                              position: absolute;
+                              font-size: 18px;
+                              font-weight: 700;
+                              color: #bbb;
+                              font-family: 'Arial', sans-serif;
+                              user-select: none;
+                    }
+
+                    /* A = top (readable when A is on top) */
+                    .answer-label.label-A {
+                              top: -30px;
+                              left: 50%;
+                              transform: translateX(-50%);
+                    }
+
+                    /* B = right (readable when rotated 90° CW, B on top) */
+                    .answer-label.label-B {
+                              right: -28px;
+                              top: 50%;
+                              transform: translateY(-50%) rotate(90deg);
+                    }
+
+                    /* C = bottom (readable when rotated 180°, C on top) */
+                    .answer-label.label-C {
+                              bottom: -30px;
+                              left: 50%;
+                              transform: translateX(-50%) rotate(180deg);
+                    }
+
+                    /* D = left (readable when rotated 90° CCW, D on top) */
+                    .answer-label.label-D {
+                              left: -28px;
+                              top: 50%;
+                              transform: translateY(-50%) rotate(-90deg);
+                    }
+
+                    /* Arrow hint between labels */
+                    .arrow-hint {
+                              position: absolute;
+                              font-size: 9px;
+                              color: #ddd;
+                    }
+
+                    .arrow-hint.top-left {
+                              top: -12px;
+                              left: 4px;
+                    }
+
+                    .arrow-hint.top-right {
+                              top: -12px;
+                              right: 4px;
+                    }
+
+                    .arrow-hint.bottom-left {
+                              bottom: -12px;
+                              left: 4px;
+                              transform: rotate(180deg);
+                    }
+
+                    .arrow-hint.bottom-right {
+                              bottom: -12px;
+                              right: 4px;
+                              transform: rotate(180deg);
+                    }
+
+                    /* Bottom branding */
+                    .bottom-brand {
+                              position: absolute;
+                              bottom: 19mm;
+                              left: 50%;
+                              transform: translateX(-50%);
+                              font-size: 9px;
+                              color: #ccc;
+                              letter-spacing: 2px;
+                    }
+
+                    /* === PRINT STYLES === */
+                    @media print {
+                              body {
+                                        background: #fff;
+                                        color: #000;
+                              }
+
+                              .controls-bar,
+                              .cards-container,
+                              .card-preview {
+                                        display: none !important;
+                              }
+
+                              .print-page {
+                                        margin: 0;
+                                        padding: 0;
+                                        box-shadow: none;
+                                        page-break-after: always;
+                              }
+
+                              .print-page:last-child {
+                                        page-break-after: auto;
+                              }
+
+                              @page {
+                                        size: A4 portrait;
+                                        margin: 0;
+                              }
+                    }
+
+                    /* Screen preview for print pages */
+                    @media screen {
+                              .print-pages-container {
+                                        display: none;
+                              }
+
+                              .print-pages-container.show-preview {
+                                        display: block;
+                                        padding: 20px;
+                              }
+
+                              .print-page {
+                                        margin: 20px auto;
+                                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                                        border-radius: 4px;
+                              }
+                    }
+          </style>
+</head>
+
+<body>
+
+          <!-- Controls -->
+          <div class="controls-bar">
+                    <h2>🎯 L-Lab Vision — Kartalar</h2>
+                    <label>O'quvchilar soni:
+                              <input type="number" id="studentCount" value="30" min="1" max="30">
+                    </label>
+                    <button class="btn-generate" onclick="generateCards()">🔄 Yaratish</button>
+                    <button class="btn-print" onclick="printCards()">🖨️ Chop etish / PDF</button>
+                    <p class="help-text">
+                              Har bir o'quvchiga alohida karta. A/B/C/D — kartani aylantirish orqali javob tanlanadi.
+                              Kartani kesgandan so'ng ishlating.
+                    </p>
+          </div>
+
+          <!-- Small preview cards -->
+          <div class="cards-container" id="previewContainer"></div>
+
+          <!-- Full A4 print pages (hidden on screen, visible in print) -->
+          <div class="print-pages-container" id="printContainer"></div>
+
+          <script>
+                    // =============================================
+                    // ArUco Marker Pattern Generator
+                    // Compatible with js-aruco by Juan Mellado
+                    // =============================================
+
+                    // Valid ArUco row patterns (Hamming code)
+                    const VALID_ROWS = [
+                              [1, 0, 0, 0, 0],  // data bits 00
+                              [1, 0, 1, 1, 1],  // data bits 01
+                              [0, 1, 0, 0, 1],  // data bits 10
+                              [0, 1, 1, 1, 0]   // data bits 11
+                    ];
+
+                    // Generate 5x5 inner pattern for a given ArUco ID
+                    function generatePattern(id) {
+                              const bits = [];
+                              for (let i = 0; i < 5; i++) {
+                                        const shift = 2 * (4 - i);
+                                        const rowData = (id >> shift) & 3;
+                                        bits[i] = VALID_ROWS[rowData].slice();
+                              }
+                              return bits;
+                    }
+
+                    // Verify pattern matches expected ID
+                    function verifyId(bits) {
+                              let id = 0;
+                              for (let i = 0; i < 5; i++) {
+                                        id <<= 1;
+                                        id |= bits[i][1];
+                                        id <<= 1;
+                                        id |= bits[i][3];
+                              }
+                              return id;
+                    }
+
+                    // Draw marker on canvas
+                    function drawMarker(canvas, id, cellSize) {
+                              const pattern = generatePattern(id);
+                              const gridSize = 7; // 5x5 inner + 2 border
+                              const totalSize = gridSize * cellSize;
+
+                              canvas.width = totalSize;
+                              canvas.height = totalSize;
+
+                              const ctx = canvas.getContext('2d');
+
+                              // Fill entire canvas black (border)
+                              ctx.fillStyle = '#000000';
+                              ctx.fillRect(0, 0, totalSize, totalSize);
+
+                              // Draw inner 5x5 pattern
+                              for (let row = 0; row < 5; row++) {
+                                        for (let col = 0; col < 5; col++) {
+                                                  if (pattern[row][col] === 1) {
+                                                            // White cell
+                                                            ctx.fillStyle = '#ffffff';
+                                                  } else {
+                                                            // Black cell
+                                                            ctx.fillStyle = '#000000';
+                                                  }
+                                                  ctx.fillRect(
+                                                            (col + 1) * cellSize,
+                                                            (row + 1) * cellSize,
+                                                            cellSize,
+                                                            cellSize
+                                                  );
+                                        }
+                              }
+
+                              return pattern;
+                    }
+
+                    // Generate all cards
+                    function generateCards() {
+                              const count = parseInt(document.getElementById('studentCount').value) || 30;
+                              const previewContainer = document.getElementById('previewContainer');
+                              const printContainer = document.getElementById('printContainer');
+
+                              previewContainer.innerHTML = '';
+                              printContainer.innerHTML = '';
+                              printContainer.classList.add('show-preview');
+
+                              for (let i = 0; i < count; i++) {
+                                        const studentNum = i + 1;
+                                        const markerId = i;
+
+                                        // Create preview card
+                                        createPreviewCard(previewContainer, markerId, studentNum);
+
+                                        // Create A4 print page
+                                        createPrintPage(printContainer, markerId, studentNum);
+                              }
+                    }
+
+                    // Create small preview card
+                    function createPreviewCard(container, markerId, studentNum) {
+                              const card = document.createElement('div');
+                              card.className = 'card-preview';
+                              card.style.cssText = 'display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; position:relative;';
+
+                              // Student number
+                              const numLabel = document.createElement('div');
+                              numLabel.style.cssText = 'font-size:16px; font-weight:800; color:#333; margin-bottom:8px;';
+                              numLabel.textContent = `P ${studentNum}`;
+                              card.appendChild(numLabel);
+
+                              // Marker wrapper with labels
+                              const wrapper = document.createElement('div');
+                              wrapper.style.cssText = 'position:relative; display:inline-block;';
+
+                              // Canvas
+                              const canvas = document.createElement('canvas');
+                              canvas.style.cssText = 'display:block;';
+                              drawMarker(canvas, markerId, 28);
+                              wrapper.appendChild(canvas);
+
+                              // A/B/C/D labels
+                              ['A', 'B', 'C', 'D'].forEach(letter => {
+                                        const label = document.createElement('div');
+                                        label.className = `answer-label label-${letter}`;
+                                        label.textContent = letter;
+                                        label.style.fontSize = '14px';
+                                        wrapper.appendChild(label);
+                              });
+
+                              card.appendChild(wrapper);
+
+                              // ID info
+                              const info = document.createElement('div');
+                              info.style.cssText = 'font-size:10px; color:#999; margin-top:8px;';
+                              info.textContent = `ID: ${markerId}`;
+                              card.appendChild(info);
+
+                              container.appendChild(card);
+                    }
+
+                    // Create full A4 print page
+                    function createPrintPage(container, markerId, studentNum) {
+                              const page = document.createElement('div');
+                              page.className = 'print-page';
+
+                              // Dashed cutting border
+                              const cutBorder = document.createElement('div');
+                              cutBorder.className = 'cut-border';
+                              page.appendChild(cutBorder);
+
+                              // Scissors
+                              const scissorsTop = document.createElement('div');
+                              scissorsTop.className = 'scissors top';
+                              scissorsTop.textContent = '✂';
+                              page.appendChild(scissorsTop);
+
+                              const scissorsBottom = document.createElement('div');
+                              scissorsBottom.className = 'scissors bottom';
+                              scissorsBottom.textContent = '✂';
+                              page.appendChild(scissorsBottom);
+
+                              // Student number in 4 corners
+                              ['tl', 'tr', 'bl', 'br'].forEach(pos => {
+                                        const corner = document.createElement('div');
+                                        corner.className = `corner-id ${pos}`;
+                                        corner.textContent = `P ${studentNum}`;
+                                        page.appendChild(corner);
+                              });
+
+                              // Side branding
+                              const brandLeft = document.createElement('div');
+                              brandLeft.className = 'side-brand left';
+                              brandLeft.textContent = 'L-Lab Vision';
+                              page.appendChild(brandLeft);
+
+                              const brandRight = document.createElement('div');
+                              brandRight.className = 'side-brand right';
+                              brandRight.textContent = 'L-Lab Vision';
+                              page.appendChild(brandRight);
+
+                              // Marker area with A/B/C/D labels
+                              const markerArea = document.createElement('div');
+                              markerArea.className = 'marker-area';
+
+                              // Canvas (large for A4)
+                              const canvas = document.createElement('canvas');
+                              drawMarker(canvas, markerId, 18); // 18mm per cell → 126mm total
+
+                              // Scale canvas for print (18px per cell × 7 = 126px, but we want ~50mm on paper)
+                              canvas.style.width = '55mm';
+                              canvas.style.height = '55mm';
+                              canvas.style.imageRendering = 'pixelated';
+
+                              markerArea.appendChild(canvas);
+
+                              // A/B/C/D labels
+                              const labels = [
+                                        { letter: 'A', cls: 'label-A' },
+                                        { letter: 'B', cls: 'label-B' },
+                                        { letter: 'C', cls: 'label-C' },
+                                        { letter: 'D', cls: 'label-D' }
+                              ];
+                              labels.forEach(l => {
+                                        const label = document.createElement('div');
+                                        label.className = `answer-label ${l.cls}`;
+                                        label.textContent = l.letter;
+                                        markerArea.appendChild(label);
+                              });
+
+                              page.appendChild(markerArea);
+
+                              // Bottom brand
+                              const bottomBrand = document.createElement('div');
+                              bottomBrand.className = 'bottom-brand';
+                              bottomBrand.textContent = 'L-Lab Vision';
+                              page.appendChild(bottomBrand);
+
+                              container.appendChild(page);
+                    }
+
+                    // Print
+                    function printCards() {
+                              generateCards();
+                              setTimeout(() => window.print(), 300);
+                    }
+
+                    // Auto-generate on load
+                    generateCards();
+          </script>
+</body>
+
+</html>

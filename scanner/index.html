@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>L-Lab Vision — Premium Scanner</title>
+    <link rel="stylesheet" href="style.css?v=3.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- === FULLSCREEN LOBBY SCREEN === -->
+    <div id="sessionScreen" class="view-screen active">
+        <div class="lobby-content">
+            <div class="lobby-icon">📷</div>
+            <h2>L-Lab Vision</h2>
+
+            <div class="info-badges">
+                <div class="badge"><i class="fas fa-file-alt"></i> <span id="sessionCount">—</span> savol</div>
+                <div class="badge"><i class="fas fa-users"></i> <span id="sessionStudents">—</span> o'quvchi</div>
+            </div>
+
+            <div class="test-title" id="sessionTitle">—</div>
+
+            <button id="startScannerBtn" class="wg-btn wg-primary btn-pulse">
+                Skanerni boshlash <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- === 1. QUIZ VIEW (Wayground Style) === -->
+    <div id="quizView" class="view-screen">
+
+        <!-- Top Nav -->
+        <div class="wg-nav">
+            <button id="btnEndQuiz" class="wg-btn-nav wg-danger"><i class="fas fa-sign-out-alt"></i> End quiz</button>
+            <div class="wg-nav-center" id="syncStatus">
+                <div class="sync-dot"></div> Sinxron
+            </div>
+            <button id="btnSkip" class="wg-btn-nav wg-secondary">Skip <i class="fas fa-forward"></i></button>
+        </div>
+
+        <!-- Question Content -->
+        <div class="wg-content">
+            <div class="q-progress">
+                <span id="current-q">1</span> of <span id="total-q">10</span>
+            </div>
+
+            <h2 class="q-text" id="questionText">Loading question...</h2>
+
+            <!-- Options List (Pre-scan) -->
+            <div class="wg-options" id="preScanOptions">
+                <div class="wg-option"><span class="opt-letter">A</span>
+                    <div class="opt-text">Loading...</div>
+                </div>
+                <div class="wg-option"><span class="opt-letter">B</span>
+                    <div class="opt-text">Loading...</div>
+                </div>
+                <div class="wg-option"><span class="opt-letter">C</span>
+                    <div class="opt-text">Loading...</div>
+                </div>
+                <div class="wg-option"><span class="opt-letter">D</span>
+                    <div class="opt-text">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Options List (Post-scan Results with Progress) -->
+            <div class="wg-results-list" id="postScanResults" style="display: none;">
+                <!-- Filled dynamically via JS -->
+                <div class="results-dropdown-header" id="toggleDetailedResults">
+                    <i class="fas fa-users"></i> <span id="total-responses">0</span> responses <i
+                        class="fas fa-chevron-down"></i>
+                </div>
+
+                <!-- Option A -->
+                <div class="wg-res-bar" id="resBarA">
+                    <div class="res-fill"></div>
+                    <div class="res-content">
+                        <span class="res-letter">A</span>
+                        <div class="res-text">...</div>
+                        <span class="res-count">0</span>
+                    </div>
+                </div>
+                <!-- Option B -->
+                <div class="wg-res-bar" id="resBarB">
+                    <div class="res-fill"></div>
+                    <div class="res-content">
+                        <span class="res-letter">B</span>
+                        <div class="res-text">...</div>
+                        <span class="res-count">0</span>
+                    </div>
+                </div>
+                <!-- Option C -->
+                <div class="wg-res-bar" id="resBarC">
+                    <div class="res-fill"></div>
+                    <div class="res-content">
+                        <span class="res-letter">C</span>
+                        <div class="res-text">...</div>
+                        <span class="res-count">0</span>
+                    </div>
+                </div>
+                <!-- Option D -->
+                <div class="wg-res-bar" id="resBarD">
+                    <div class="res-fill"></div>
+                    <div class="res-content">
+                        <span class="res-letter">D</span>
+                        <div class="res-text">...</div>
+                        <span class="res-count">0</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Action -->
+        <div class="wg-bottom">
+            <button id="btnScanMode" class="wg-btn wg-primary">Scan responses</button>
+            <button id="btnNextQ" class="wg-btn wg-purple" style="display:none;">Next question</button>
+        </div>
+
+    </div>
+
+
+    <!-- === 2. CAMERA VIEW (Fullscreen Scanner) === -->
+    <div id="cameraView" class="view-screen">
+
+        <!-- Fixed Top Container for Video -->
+        <div id="scanner-container">
+            <video id="videoInput" playsinline autoplay muted></video>
+            <canvas id="canvasOutput"></canvas>
+            <div id="loadingMessage">Kamera ishga tushmoqda...</div>
+            <div id="debugConsole"></div>
+
+            <!-- White Targeting Frame -->
+            <div class="scanner-target-frame">
+                <div class="corner top-left"></div>
+                <div class="corner top-right"></div>
+                <div class="corner bottom-left"></div>
+                <div class="corner bottom-right"></div>
+            </div>
+
+            <!-- Zoom Controls (Bottom Right of Camera) -->
+            <div class="wg-zoom-controls">
+                <div class="zoom-badge" id="zoomLevelIndicator">1x</div>
+                <button class="zoom-btn" id="btnZoomIn"><i class="fas fa-search-plus"></i></button>
+                <button class="zoom-btn" id="btnZoomOut"><i class="fas fa-search-minus"></i></button>
+            </div>
+
+            <!-- Float Nav Top inside scanner -->
+            <div class="cam-top-actions">
+                <button id="btnFlipCam" class="cam-icon-btn"><i class="fas fa-sync-alt"></i></button>
+                <button id="btnCloseCam" class="cam-icon-btn"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+
+        <!-- Premium Floating Action Bar -->
+        <div id="bottom-action-bar">
+            <!-- Submit Button (Always Visible) -->
+            <button id="btnSubmitScans" class="action-btn" disabled>Submit (<span
+                    id="sheet-scanned-count">0</span>)</button>
+        </div>
+
+    </div>
+
+    <!-- === 3. FINAL LEADERBOARD === -->
+    <div id="leaderboardScreen" class="view-screen">
+        <div class="lb-header">
+            <div class="lb-trophy">🏅</div>
+            <h2>Yakuniy natijalar</h2>
+            <p>Jami skanerlangan javoblar tahlili</p>
+        </div>
+        <div class="lb-list" id="lbList"></div>
+
+        <div class="wg-bottom" style="position: absolute; bottom: 0; width: 100%;">
+            <button id="sendResultsBtn" class="wg-btn wg-primary" style="margin-bottom: 5px;">📤 Natijalarni
+                saqlash</button>
+            <p id="sendStatus" style="text-align:center;font-size:13px;color:#94a3b8;margin: 0;"></p>
+        </div>
+    </div>
+
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../miniapp/supabaseConfig.js"></script>
+    <script src="cv.js"></script>
+    <script src="aruco.js"></script>
+    <script src="app.js?v=3.0"></script>
+</body>
+
+</html>

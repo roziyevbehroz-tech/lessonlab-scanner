@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>L-Lab Pult Boshqaruvi (Ustoz)</title>
+          <!-- Tailwind & SweetAlert -->
+          <script src="https://cdn.tailwindcss.com"></script>
+          <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+          <!-- FontAwesome -->
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+          <!-- Supabase JS -->
+          <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+          <style>
+                    .student-card {
+                              transition: all 0.3s ease;
+                              position: relative;
+                    }
+
+                    .student-card.paused {
+                              opacity: 0.5;
+                              filter: grayscale(100%);
+                    }
+
+                    .paused-overlay {
+                              position: absolute;
+                              top: 0;
+                              left: 0;
+                              width: 100%;
+                              height: 100%;
+                              background: rgba(0, 0, 0, 0.1);
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              font-size: 2rem;
+                              color: #ef4444;
+                              border-radius: inherit;
+                              z-index: 10;
+                              display: none;
+                    }
+
+                    .student-card.paused .paused-overlay {
+                              display: flex;
+                    }
+
+                    .card-actions {
+                              position: absolute;
+                              top: 4px;
+                              right: 4px;
+                              z-index: 20;
+                    }
+          </style>
+</head>
+
+<body class="bg-gray-50 h-screen flex flex-col font-sans">
+
+          <!-- Supabase config injected -->
+          <script src="../miniapp/supabaseConfig.js"></script>
+
+          <!-- Header Area -->
+          <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center">
+                    <div>
+                              <h1 class="text-xl font-bold">L-Lab Premium: Ustoz Boshqaruvi</h1>
+                              <p id="testStatus" class="text-sm opacity-80">Test ma'lumotlari yuklanmoqda...</p>
+                    </div>
+                    <div class="flex gap-2">
+                              <span id="syncStatus"
+                                        class="text-sm bg-gray-700 px-3 py-1 rounded-full flex items-center gap-1">
+                                        <i class="fas fa-wifi text-gray-400"></i> Doska bilan aloqa o'rnatilmoqda...
+                              </span>
+                              <button id="btnConnect"
+                                        class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded shadow flex items-center gap-2 transition-colors font-semibold">
+                                        🔗 Pult Qabul Qilgichini Ulash
+                              </button>
+                    </div>
+          </header>
+
+          <!-- Main Content Area -->
+          <main class="flex-1 overflow-hidden flex flex-col p-4 md:flex-row gap-4">
+
+                    <!-- Left Panel: Stats & Controls -->
+                    <div class="w-full md:w-1/3 bg-white rounded-lg shadow-lg flex flex-col overflow-hidden">
+                              <div class="p-5 border-b border-gray-100">
+                                        <h2 id="testTitle" class="text-2xl font-bold mb-1 text-gray-800">Yuklanmoqda...
+                                        </h2>
+                                        <p class="text-sm text-gray-500 mb-4" id="lblClass">Sinf: Yuklanmoqda</p>
+
+                                        <div class="grid grid-cols-2 gap-3 mb-4">
+                                                  <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                                            <p
+                                                                      class="text-xs text-gray-500 uppercase font-bold tracking-wider">
+                                                                      Savollar</p>
+                                                            <p class="text-xl font-bold text-gray-800"
+                                                                      id="lblQuestions">0</p>
+                                                  </div>
+                                                  <div class="bg-gray-50 p-3 rounded border border-gray-100">
+                                                            <p
+                                                                      class="text-xs text-gray-500 uppercase font-bold tracking-wider">
+                                                                      O'quvchilar</p>
+                                                            <p class="text-xl font-bold text-gray-800" id="lblStudents">
+                                                                      0</p>
+                                                  </div>
+                                        </div>
+
+                                        <div id="connStatus"
+                                                  class="p-3 bg-yellow-50 text-yellow-800 border-[1px] border-yellow-300 rounded text-sm flex items-center gap-2">
+                                                  <i class="fas fa-exclamation-circle text-yellow-500"></i>
+                                                  <span>Arduinoga ulanilmagan. Yuqoridagi yashil tugmani bosing.</span>
+                                        </div>
+                              </div>
+
+                              <!-- Session Controls (Teacher Controls) -->
+                              <div class="p-5 flex-1 flex flex-col justify-end bg-gray-50">
+                                        <div id="quizControls" class="flex flex-col gap-3">
+                                                  <div
+                                                            class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm mb-2">
+                                                            <span class="font-bold text-gray-600 text-sm uppercase">Smart
+                                                                      Doska Boshqaruvi</span>
+                                                  </div>
+
+                                                  <div class="flex gap-2 w-full">
+                                                            <button id="btnPrev"
+                                                                      class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded flex-1 transition-all">
+                                                                      <i class="fas fa-arrow-left"></i> Oldingi
+                                                            </button>
+                                                            <button id="btnNext"
+                                                                      class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded flex-1 transition-all border-b-4 border-blue-800 active:border-b-0 active:translate-y-1">
+                                                                      Keyingi <i class="fas fa-arrow-right"></i>
+                                                            </button>
+                                                  </div>
+                                                  <button id="btnFinish"
+                                                            class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded mt-2 transition-all flex justify-center items-center gap-2">
+                                                            🏁 Natijalarni Ko'rsatish
+                                                  </button>
+                                        </div>
+                              </div>
+                    </div>
+
+                    <!-- Right Panel: Students Grid -->
+                    <div class="w-full md:w-2/3 bg-white rounded-lg shadow-lg flex flex-col">
+                              <div
+                                        class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
+                                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                                  <i class="fas fa-users text-blue-500"></i> Sinf xonasi (Bloklash)
+                                        </h3>
+                              </div>
+
+                              <div class="flex-1 p-4 overflow-y-auto bg-gray-100/50">
+                                        <div id="studentsGrid"
+                                                  class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                                  <div class="text-center p-8 text-gray-400 col-span-full">
+                                                            Yuklanmoqda...</div>
+                                        </div>
+                              </div>
+                    </div>
+          </main>
+
+          <script>
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const testId = urlParams.get('test_id');
+                    const classId = urlParams.get('class_id');
+
+                    let studentsMap = {};
+                    let activeChannel = null;
+                    let pausedRemotes = new Set(); // Stores remote_ids
+
+                    const els = {
+                              title: document.getElementById('testTitle'),
+                              lblClass: document.getElementById('lblClass'),
+                              lblQ: document.getElementById('lblQuestions'),
+                              lblS: document.getElementById('lblStudents'),
+                              grid: document.getElementById('studentsGrid'),
+                              connStatus: document.getElementById('connStatus'),
+                              btnConnect: document.getElementById('btnConnect'),
+                              syncStatus: document.getElementById('syncStatus')
+                    };
+
+                    async function init() {
+                              if (!testId || !classId) {
+                                        Swal.fire('Xato', 'URL da test_id yoki class_id yo\'q!', 'error');
+                                        return;
+                              }
+                              try {
+                                        // Fetch Test
+                                        const { data: tData } = await supabaseClient.from('bot_tests').select('title').eq('id', testId).single();
+                                        if (tData) els.title.innerText = tData.title;
+
+                                        // Fetch Class
+                                        const { data: cData } = await supabaseClient.from('bot_classes').select('name').eq('id', classId).single();
+                                        if (cData) els.lblClass.innerText = `Sinf: ${cData.name}`;
+
+                                        // Fetch Q count
+                                        const { count: qCount } = await supabaseClient.from('bot_questions').select('*', { count: 'exact', head: true }).eq('test_id', testId);
+                                        els.lblQ.innerText = qCount || 0;
+
+                                        // Fetch Students
+                                        const { data: stdData } = await supabaseClient.from('bot_students').select('*').eq('class_id', classId).order('full_name');
+                                        if (stdData) {
+                                                  els.lblS.innerText = stdData.length;
+                                                  renderStudents(stdData);
+                                        }
+
+                                        // Setup Realtime
+                                        setupRealtime();
+
+                              } catch (e) {
+                                        console.error(e);
+                                        Swal.fire('Xato', 'Ma\'lumotlarni yuklashda xatolik', 'error');
+                              }
+                    }
+
+                    function renderStudents(students) {
+                              els.grid.innerHTML = '';
+                              students.forEach(st => {
+                                        const rId = st.remote_id;
+                                        if (rId) studentsMap[rId] = st;
+
+                                        const card = document.createElement('div');
+                                        card.id = `card-${st.id}`;
+                                        card.className = "student-card border rounded p-3 text-center bg-white shadow-sm flex flex-col justify-center items-center h-28 relative";
+
+                                        const overlay = document.createElement('div');
+                                        overlay.className = 'paused-overlay';
+                                        overlay.innerHTML = '<i class="fas fa-ban drop-shadow-md"></i>';
+
+                                        const actions = document.createElement('div');
+                                        actions.className = 'card-actions';
+                                        const btnPause = document.createElement('button');
+                                        btnPause.className = 'text-gray-400 hover:text-red-500 transition-colors p-1 bg-white/80 rounded-full w-8 h-8 flex items-center justify-center';
+                                        btnPause.innerHTML = '<i class="fas fa-ban text-sm"></i>';
+                                        btnPause.onclick = () => {
+                                                  if (!rId) return Swal.fire('Xato', 'O\'quvchiga pult biriktirilmagan!', 'warning');
+
+                                                  if (pausedRemotes.has(rId)) {
+                                                            pausedRemotes.delete(rId);
+                                                            card.classList.remove('paused');
+                                                            btnPause.classList.replace('text-red-500', 'text-gray-400');
+                                                  } else {
+                                                            pausedRemotes.add(rId);
+                                                            card.classList.add('paused');
+                                                            btnPause.classList.replace('text-gray-400', 'text-red-500');
+                                                  }
+                                        };
+                                        actions.appendChild(btnPause);
+
+                                        card.innerHTML += `
+                    <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-1 text-gray-500 text-lg">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <p class="font-bold text-gray-800 text-sm leading-tight px-1 truncate w-full" title="${st.full_name}">${st.full_name}</p>
+                    <p class="text-xs text-gray-400 mt-1">${rId ? 'Pult: ' + rId : 'Pult yo\'q'}</p>
+                `;
+                                        card.appendChild(overlay);
+                                        card.appendChild(actions);
+                                        els.grid.appendChild(card);
+                              });
+                    }
+
+                    // --- SUPABASE REALTIME (BROADCASTER) ---
+                    function setupRealtime() {
+                              const channelName = `session-${testId}-${classId}`;
+                              activeChannel = supabaseClient.channel(channelName);
+
+                              activeChannel.subscribe((status) => {
+                                        if (status === 'SUBSCRIBED') {
+                                                  els.syncStatus.innerHTML = '<i class="fas fa-wifi text-green-400"></i> Doskaga bog\'langan';
+                                                  els.syncStatus.classList.replace('bg-gray-700', 'bg-green-900');
+                                                  document.getElementById('testStatus').innerText = "Tizim tayyor. Smart doskani boshqaring.";
+                                        } else {
+                                                  els.syncStatus.innerHTML = '<i class="fas fa-wifi text-red-400"></i> Doska bilan uzilish';
+                                                  els.syncStatus.classList.replace('bg-green-900', 'bg-red-900');
+                                        }
+                              });
+                    }
+
+                    function broadcastAction(actionType) {
+                              if (!activeChannel) return;
+                              activeChannel.send({
+                                        type: 'broadcast',
+                                        event: 'control',
+                                        payload: { action: actionType }
+                              });
+                    }
+
+                    document.getElementById('btnNext').onclick = () => broadcastAction('next_question');
+                    document.getElementById('btnPrev').onclick = () => broadcastAction('prev_question');
+                    document.getElementById('btnFinish').onclick = () => broadcastAction('finish');
+
+                    // --- WEB SERIAL API (ARDUINO) ---
+                    let port, reader, readLoopActive = false;
+
+                    els.btnConnect.addEventListener('click', async () => {
+                              try {
+                                        if (!navigator.serial) return Swal.fire('Xato', 'Web Serial API ishlamaydi (Chrome ishlating).', 'error');
+
+                                        port = await navigator.serial.requestPort();
+                                        await port.open({ baudRate: 9600 });
+
+                                        els.connStatus.innerHTML = `<i class="fas fa-check-circle text-green-500"></i> <b>Arduino Ulandi!</b> Kutish zalida pultlarni faollashtiring.`;
+                                        els.connStatus.className = "p-3 bg-green-50 text-green-800 border-[1px] border-green-300 rounded text-sm flex items-center gap-2";
+
+                                        els.btnConnect.className = "bg-gray-200 text-gray-500 px-4 py-2 rounded shadow flex items-center gap-2 font-semibold cursor-not-allowed";
+                                        els.btnConnect.innerHTML = `<i class="fas fa-usb text-green-500"></i> Arduino faol`;
+                                        els.btnConnect.disabled = true;
+
+                                        readLoopActive = true;
+                                        readSerialLoop();
+                              } catch (err) { }
+                    });
+
+                    async function readSerialLoop() {
+                              const textDecoder = new TextDecoderStream();
+                              port.readable.pipeTo(textDecoder.writable);
+                              reader = textDecoder.readable.getReader();
+
+                              let buffer = "";
+                              try {
+                                        while (readLoopActive) {
+                                                  const { value, done } = await reader.read();
+                                                  if (done) break;
+                                                  if (value) {
+                                                            buffer += value;
+                                                            let lines = buffer.split('\n');
+                                                            buffer = lines.pop(); // Keep incomplete line
+                                                            for (let line of lines) {
+                                                                      if (line.trim() !== '') processRemoteSignal(line.trim());
+                                                            }
+                                                  }
+                                        }
+                              } catch (error) {
+                                        console.error(error);
+                              }
+                    }
+
+                    // Process "ID:105432,BTN:A"
+                    function processRemoteSignal(signalData) {
+                              if (!activeChannel) return;
+                              const match = signalData.match(/ID:(\d+),BTN:([A-E])/);
+                              if (match) {
+                                        const rId = match[1];
+                                        const btn = match[2];
+
+                                        // Block if physically paused by teacher
+                                        if (pausedRemotes.has(rId)) {
+                                                  console.log(`[BLOCKED] signal from paused remote: ${rId}`);
+                                                  return;
+                                        }
+
+                                        // Emit over supabase!
+                                        activeChannel.send({
+                                                  type: 'broadcast',
+                                                  event: 'remote_signal',
+                                                  payload: { remote_id: rId, key: btn }
+                                        });
+
+                                        // Small visual feedback on teacher screen
+                                        if (studentsMap[rId]) {
+                                                  const studentId = studentsMap[rId].id;
+                                                  const card = document.getElementById(`card-${studentId}`);
+                                                  if (card) {
+                                                            const originalBg = card.style.backgroundColor;
+                                                            card.style.backgroundColor = '#dbeafe'; // light blue blink
+                                                            setTimeout(() => { card.style.backgroundColor = originalBg; }, 300);
+                                                  }
+                                        }
+                              }
+                    }
+
+                    window.addEventListener('DOMContentLoaded', init);
+
+          </script>
+</body>
+
+</html>

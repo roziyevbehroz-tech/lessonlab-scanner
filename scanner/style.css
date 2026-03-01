@@ -1,0 +1,712 @@
+/* === WAYGROUND STYLE PREMIUM GLOBAL === */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+* {
+    box-sizing: border-box;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: #1c1c1c;
+    color: #fff;
+    height: 100dvh;
+    /* MUHIM: vh emas, dvh bo'lishi shart! */
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Base Screens */
+.view-screen {
+    position: fixed;
+    /* absolute emas, fixed bo'lishi shart */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100dvh;
+    /* vh emas, dvh */
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    background-color: #1c1c1c;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform: translateX(100%);
+    /* Slide in from right */
+    opacity: 0;
+    pointer-events: none;
+}
+
+.view-screen.active {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: all;
+    z-index: 20;
+}
+
+/* ============================================
+   LOBBY SCREEN
+   ============================================ */
+#sessionScreen {
+    background: linear-gradient(135deg, #1c1c1c 0%, #2b1f40 100%);
+    justify-content: center;
+    align-items: center;
+}
+
+.lobby-content {
+    text-align: center;
+    padding: 30px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.lobby-icon {
+    font-size: 60px;
+    margin-bottom: 10px;
+    animation: bounce 2s infinite ease-in-out;
+}
+
+.lobby-content h2 {
+    font-size: 28px;
+    font-weight: 800;
+    margin: 0 0 20px 0;
+    background: linear-gradient(135deg, #9b63f0, #d9b8ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.info-badges {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #d1d5db;
+}
+
+.test-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 40px;
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #3d3d3d;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* ============================================
+   WG BUTTONS & NAV
+   ============================================ */
+.wg-btn {
+    width: 100%;
+    padding: 18px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+}
+
+.wg-primary {
+    background-color: #9254de;
+    /* Wayground Purple */
+    color: white;
+}
+
+.wg-primary:active {
+    background-color: #722ed1;
+    transform: scale(0.98);
+}
+
+.wg-primary:disabled {
+    background-color: #4a3e5e;
+    color: #888;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.wg-danger {
+    background-color: #ef4444;
+    color: white;
+}
+
+.wg-purple {
+    background-color: #e9d8fd;
+    color: #553c9a;
+}
+
+/* Top Nav */
+.wg-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #2e2e2e;
+    position: sticky;
+    top: 0;
+    background: #1c1c1c;
+    z-index: 50;
+}
+
+.wg-btn-nav {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.wg-btn-nav.wg-secondary {
+    background-color: #333333;
+    color: #dddddd;
+}
+
+.wg-nav-center {
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+}
+
+.sync-dot.offline {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+}
+
+/* Bottom Action Area */
+.wg-bottom {
+    padding: 20px;
+    background: #1c1c1c;
+    border-top: 1px solid #2e2e2e;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ============================================
+   1. QUIZ VIEW CONTENT
+   ============================================ */
+.wg-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    padding-bottom: 100px;
+    /* Space for bottom bar */
+}
+
+.q-progress {
+    color: #aaaaaa;
+    font-size: 14px;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.q-text {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 0 0 25px 0;
+    color: #f8fafc;
+}
+
+/* Simple Option Blocks (Pre-scan) */
+.wg-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wg-option {
+    background: #2b2b2b;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.opt-letter {
+    font-weight: 700;
+    color: #94a3b8;
+    font-size: 16px;
+    min-width: 20px;
+}
+
+.opt-text {
+    color: #f1f5f9;
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+}
+
+/* Post-Scan Results with Progress (Wayground) */
+.wg-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.results-dropdown-header {
+    background: #252525;
+    padding: 12px 15px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #ccc;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.wg-res-bar {
+    position: relative;
+    background: #2b2b2b;
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 54px;
+}
+
+.res-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    /* JS controlled */
+    background: rgba(255, 255, 255, 0.1);
+    /* Default neutral */
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+}
+
+.res-fill.correct {
+    background: #1e3a24;
+    /* Dark greenish */
+    border-right: 4px solid #22c55e;
+}
+
+.res-fill.wrong {
+    background: #3d1c1c;
+    /* Dark reddish */
+    border-right: 4px solid #ef4444;
+}
+
+.res-content {
+    position: relative;
+    z-index: 2;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+    height: 100%;
+}
+
+.res-letter {
+    font-weight: 700;
+    color: #ef4444;
+    /* Default to red */
+}
+
+.wg-res-bar .res-fill.correct~.res-content .res-letter {
+    color: #22c55e;
+    /* Correct is green */
+}
+
+.res-text {
+    flex: 1;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.res-count {
+    font-weight: 700;
+    font-size: 16px;
+    color: #fff;
+}
+
+
+/* ============================================
+   2. CAMERA VIEW (Scanner) - Fixed Layout Rule
+   ============================================ */
+#cameraView {
+    background-color: #000;
+}
+
+#scanner-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Butun ekranni egallasin */
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#videoInput {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#canvasOutput {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 15;
+}
+
+#loadingMessage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 20px;
+    border-radius: 20px;
+    z-index: 20;
+}
+
+.cam-top-actions {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    z-index: 50;
+}
+
+.cam-icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+/* ============================================
+   TARGET FRAME (White corners)
+   ============================================ */
+.scanner-target-frame {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 250px;
+    height: 250px;
+    z-index: 25;
+    pointer-events: none;
+}
+
+.scanner-target-frame .corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border-color: rgba(255, 255, 255, 0.8);
+    border-style: solid;
+}
+
+.scanner-target-frame .top-left {
+    top: 0;
+    left: 0;
+    border-width: 4px 0 0 4px;
+}
+
+.scanner-target-frame .top-right {
+    top: 0;
+    right: 0;
+    border-width: 4px 4px 0 0;
+}
+
+.scanner-target-frame .bottom-left {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 4px 4px;
+}
+
+.scanner-target-frame .bottom-right {
+    bottom: 0;
+    right: 0;
+    border-width: 0 4px 4px 0;
+}
+
+/* ============================================
+   ZOOM CONTROLS
+   ============================================ */
+.wg-zoom-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 50;
+}
+
+.zoom-badge {
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 2px;
+}
+
+.zoom-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.zoom-btn:active {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* Overlay specific elements */
+.wg-scan-badge {
+    position: absolute;
+    background: #000;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.wg-scan-ans-badge {
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: white;
+}
+
+.wg-scan-ans-badge.correct {
+    background: #22c55e;
+}
+
+.wg-scan-ans-badge.wrong {
+    background: #ef4444;
+}
+
+
+/* Floating Premium Action Bar */
+#bottom-action-bar {
+    position: fixed;
+    bottom: 30px;
+    /* Ekran tagidan biroz tepada havoda suzib turadi */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 400px;
+    background: rgba(30, 30, 30, 0.75);
+    /* Yarim shaffof qora */
+    backdrop-filter: blur(16px);
+    /* Shishasimon effekt */
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.action-btn {
+    flex: 1;
+    padding: 16px;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    background-color: #9254de;
+    color: white;
+    text-align: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.action-btn:active {
+    transform: scale(0.95);
+}
+
+.action-btn:disabled {
+    background-color: #4a3e5e;
+    color: #888;
+    cursor: not-allowed;
+}
+
+
+/* ============================================
+   3. FINAL LEADERBOARD
+   ============================================ */
+#leaderboardScreen {
+    background: #1c1c1c;
+    padding: 40px 20px;
+    align-items: center;
+}
+
+.lb-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.lb-trophy {
+    font-size: 64px;
+    margin-bottom: 10px;
+}
+
+.lb-header h2 {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 0;
+    color: #fff;
+}
+
+.lb-header p {
+    color: #888;
+    font-size: 14px;
+}
+
+.lb-list {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 100px;
+    overflow-y: auto;
+}
+
+.lb-row {
+    background: #2b2b2b;
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.lb-rank {
+    font-size: 18px;
+    font-weight: 800;
+    color: #666;
+    width: 24px;
+}
+
+.lb-row:nth-child(1) .lb-rank {
+    color: #f59e0b;
+}
+
+.lb-row:nth-child(2) .lb-rank {
+    color: #94a3b8;
+}
+
+.lb-row:nth-child(3) .lb-rank {
+    color: #b45309;
+}
+
+.lb-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: 16px;
+    color: #fff;
+}
+
+.lb-score {
+    font-weight: 800;
+    color: #22c55e;
+    font-size: 16px;
+}
+
+/* Debug hidden */
+#debugConsole {
+    display: none;
+}

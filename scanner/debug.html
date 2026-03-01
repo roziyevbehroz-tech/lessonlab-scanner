@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>ArUco Debug Test</title>
+          <style>
+                    * {
+                              margin: 0;
+                              padding: 0;
+                              box-sizing: border-box;
+                    }
+
+                    body {
+                              font-family: monospace;
+                              background: #111;
+                              color: #0f0;
+                              padding: 10px;
+                    }
+
+                    h2 {
+                              margin: 8px 0;
+                              color: #0ff;
+                    }
+
+                    .section {
+                              margin: 12px 0;
+                              padding: 10px;
+                              border: 1px solid #333;
+                              border-radius: 6px;
+                    }
+
+                    canvas {
+                              border: 1px solid #555;
+                              display: block;
+                              margin: 4px 0;
+                              image-rendering: pixelated;
+                    }
+
+                    .log {
+                              background: #000;
+                              padding: 8px;
+                              font-size: 12px;
+                              max-height: 300px;
+                              overflow-y: auto;
+                              white-space: pre-wrap;
+                              border: 1px solid #333;
+                    }
+
+                    .ok {
+                              color: #0f0;
+                    }
+
+                    .err {
+                              color: #f00;
+                    }
+
+                    .warn {
+                              color: #ff0;
+                    }
+
+                    .marker-row {
+                              display: flex;
+                              flex-wrap: wrap;
+                              gap: 8px;
+                              align-items: flex-start;
+                    }
+
+                    .marker-box {
+                              text-align: center;
+                              background: #222;
+                              padding: 6px;
+                              border-radius: 4px;
+                    }
+
+                    .marker-box canvas {
+                              margin: 0 auto;
+                    }
+
+                    .marker-box .label {
+                              font-size: 10px;
+                              color: #aaa;
+                    }
+
+                    button {
+                              padding: 8px 16px;
+                              margin: 4px;
+                              background: #0066ff;
+                              color: #fff;
+                              border: none;
+                              border-radius: 4px;
+                              cursor: pointer;
+                              font-size: 14px;
+                    }
+
+                    button:hover {
+                              background: #0044cc;
+                    }
+
+                    video {
+                              display: none;
+                    }
+
+                    #cameraCanvas {
+                              max-width: 100%;
+                    }
+
+                    .detection-info {
+                              display: flex;
+                              flex-wrap: wrap;
+                              gap: 10px;
+                              margin: 8px 0;
+                    }
+
+                    .det-card {
+                              background: #1a1a2e;
+                              padding: 8px 12px;
+                              border-radius: 6px;
+                              border: 1px solid #444;
+                    }
+
+                    .det-card .val {
+                              font-size: 20px;
+                              font-weight: bold;
+                              color: #fff;
+                    }
+          </style>
+</head>
+
+<body>
+
+          <h1 style="color: #fff;">🔬 ArUco Detection Debug Tool</h1>
+
+          <!-- TEST 1: Pattern Generation -->
+          <div class="section">
+                    <h2>TEST 1: Pattern Generation & Verification</h2>
+                    <p>Generating markers 0–9 and verifying ID roundtrip...</p>
+                    <div class="marker-row" id="markerRow"></div>
+                    <div class="log" id="genLog"></div>
+          </div>
+
+          <!-- TEST 2: Static Detection -->
+          <div class="section">
+                    <h2>TEST 2: Static Detection (generated image → detect)</h2>
+                    <p>Drawing a marker onto a canvas as if it were a camera frame, then running detection...</p>
+                    <canvas id="testCanvas" width="320" height="320"></canvas>
+                    <div class="log" id="detectLog"></div>
+          </div>
+
+          <!-- TEST 3: Camera Detection -->
+          <div class="section">
+                    <h2>TEST 3: Camera Detection (live)</h2>
+                    <button onclick="startCamera()">📷 Start Camera</button>
+                    <button onclick="stopCamera()">⏹ Stop Camera</button>
+                    <div class="detection-info">
+                              <div class="det-card">Frames: <span class="val" id="frameCount">0</span></div>
+                              <div class="det-card">Markers: <span class="val" id="markerCount">0</span></div>
+                              <div class="det-card">IDs: <span class="val" id="markerIds">—</span></div>
+                    </div>
+                    <video id="videoInput" playsinline autoplay muted></video>
+                    <canvas id="cameraCanvas"></canvas>
+                    <div class="log" id="cameraLog" style="max-height:200px;"></div>
+          </div>
+
+          <script src="cv.js"></script>
+          <script src="aruco.js"></script>
+          <script>
+                    (function () {
+                              // ========================================
+                              // TEST 1: Pattern generation & verification
+                              // ========================================
+                              const genLog = document.getElementById('genLog');
+                              const markerRow = document.getElementById('markerRow');
+
+                              const VALID_ROWS = [
+                                        [1, 0, 0, 0, 0],
+                                        [1, 0, 1, 1, 1],
+                                        [0, 1, 0, 0, 1],
+                                        [0, 1, 1, 1, 0]
+                              ];
+
+                              function generatePattern(id) {
+                                        const bits = [];
+                                        for (let i = 0; i < 5; i++) {
+                                                  const shift = 2 * (4 - i);
+                                                  const rowData = (id >> shift) & 3;
+                                                  bits[i] = VALID_ROWS[rowData].slice();
+                                        }
+                                        return bits;
+                              }
+
+                              function mat2id(bits) {
+                                        let id = 0;
+                                        for (let i = 0; i < 5; i++) {
+                                                  id <<= 1; id |= bits[i][1];
+                                                  id <<= 1; id |= bits[i][3];
+                                        }
+                                        return id;
+                              }
+
+                              function drawMarkerOnCanvas(canvas, id, cellSize) {
+                                        const pattern = generatePattern(id);
+                                        const gridSize = 7;
+                                        const totalSize = gridSize * cellSize;
+                                        canvas.width = totalSize;
+                                        canvas.height = totalSize;
+                                        const ctx = canvas.getContext('2d');
+
+                                        // Black border
+                                        ctx.fillStyle = '#000';
+                                        ctx.fillRect(0, 0, totalSize, totalSize);
+
+                                        // Inner 5x5
+                                        for (let row = 0; row < 5; row++) {
+                                                  for (let col = 0; col < 5; col++) {
+                                                            ctx.fillStyle = pattern[row][col] === 1 ? '#fff' : '#000';
+                                                            ctx.fillRect((col + 1) * cellSize, (row + 1) * cellSize, cellSize, cellSize);
+                                                  }
+                                        }
+                                        return pattern;
+                              }
+
+                              function hammingDistance(bits) {
+                                        const ids = [[1, 0, 0, 0, 0], [1, 0, 1, 1, 1], [0, 1, 0, 0, 1], [0, 1, 1, 1, 0]];
+                                        let dist = 0;
+                                        for (let i = 0; i < 5; i++) {
+                                                  let minSum = Infinity;
+                                                  for (let j = 0; j < 4; j++) {
+                                                            let sum = 0;
+                                                            for (let k = 0; k < 5; k++) {
+                                                                      sum += bits[i][k] === ids[j][k] ? 0 : 1;
+                                                            }
+                                                            if (sum < minSum) minSum = sum;
+                                                  }
+                                                  dist += minSum;
+                                        }
+                                        return dist;
+                              }
+
+                              // Run test 1
+                              let allPass = true;
+                              for (let id = 0; id < 10; id++) {
+                                        const pattern = generatePattern(id);
+                                        const recoveredId = mat2id(pattern);
+                                        const hd = hammingDistance(pattern);
+                                        const pass = (recoveredId === id && hd === 0);
+                                        if (!pass) allPass = false;
+
+                                        const box = document.createElement('div');
+                                        box.className = 'marker-box';
+                                        const c = document.createElement('canvas');
+                                        drawMarkerOnCanvas(c, id, 8);
+                                        c.style.width = '56px'; c.style.height = '56px';
+                                        box.appendChild(c);
+                                        const label = document.createElement('div');
+                                        label.className = 'label';
+                                        label.textContent = `ID ${id} → ${recoveredId} HD=${hd}`;
+                                        label.style.color = pass ? '#0f0' : '#f00';
+                                        box.appendChild(label);
+                                        markerRow.appendChild(box);
+
+                                        genLog.innerHTML += `<span class="${pass ? 'ok' : 'err'}">ID ${id}: pattern→mat2id=${recoveredId}, hamming=${hd} ${pass ? '✓' : '✗ FAIL'}</span>\n`;
+                                        genLog.innerHTML += `  Rows: ${pattern.map(r => '[' + r.join(',') + ']').join(' ')}\n`;
+                              }
+                              genLog.innerHTML += `\n<span class="${allPass ? 'ok' : 'err'}">TEST 1: ${allPass ? 'ALL PASSED ✅' : 'SOME FAILED ❌'}</span>\n`;
+
+                              // ========================================
+                              // TEST 2: Static detection
+                              // ========================================
+                              const detectLog = document.getElementById('detectLog');
+                              const testCanvas = document.getElementById('testCanvas');
+
+                              function runStaticDetection() {
+                                        const ctx = testCanvas.getContext('2d');
+                                        ctx.fillStyle = '#ffffff';
+                                        ctx.fillRect(0, 0, 320, 320);
+
+                                        // Draw marker ID=1 in center (90px, ~13px cells)
+                                        const markerSize = 91; // 7 * 13
+                                        const cellSize = 13;
+                                        const ox = 60, oy = 60;
+
+                                        const pattern = generatePattern(1);
+
+                                        // Black border
+                                        ctx.fillStyle = '#000';
+                                        ctx.fillRect(ox, oy, markerSize, markerSize);
+
+                                        // Inner pattern
+                                        for (let row = 0; row < 5; row++) {
+                                                  for (let col = 0; col < 5; col++) {
+                                                            ctx.fillStyle = pattern[row][col] === 1 ? '#fff' : '#000';
+                                                            ctx.fillRect(ox + (col + 1) * cellSize, oy + (row + 1) * cellSize, cellSize, cellSize);
+                                                  }
+                                        }
+
+                                        // Now try to detect
+                                        try {
+                                                  const imageData = ctx.getImageData(0, 0, 320, 320);
+                                                  detectLog.innerHTML += `ImageData: ${imageData.width}x${imageData.height}, data length: ${imageData.data.length}\n`;
+
+                                                  const detector = new AR.Detector();
+                                                  detectLog.innerHTML += 'AR.Detector created ✓\n';
+                                                  detectLog.innerHTML += `CV object exists: ${typeof CV !== 'undefined' ? '✓' : '✗'}\n`;
+                                                  detectLog.innerHTML += `CV.grayscale exists: ${typeof CV.grayscale === 'function' ? '✓' : '✗'}\n`;
+                                                  detectLog.innerHTML += `CV.adaptiveThreshold exists: ${typeof CV.adaptiveThreshold === 'function' ? '✓' : '✗'}\n`;
+                                                  detectLog.innerHTML += `CV.findContours exists: ${typeof CV.findContours === 'function' ? '✓' : '✗'}\n`;
+                                                  detectLog.innerHTML += `CV.warp exists: ${typeof CV.warp === 'function' ? '✓' : '✗'}\n`;
+
+                                                  const markers = detector.detect(imageData);
+                                                  detectLog.innerHTML += `\nDetection result: ${markers.length} markers found\n`;
+
+                                                  if (markers.length === 0) {
+                                                            detectLog.innerHTML += `<span class="warn">⚠ No markers detected from static image</span>\n`;
+
+                                                            // Debug: check intermediate steps
+                                                            detectLog.innerHTML += `\nDebugging intermediate steps:\n`;
+                                                            const grey = new CV.Image();
+                                                            CV.grayscale(imageData, grey);
+                                                            detectLog.innerHTML += `  Grey: ${grey.width}x${grey.height}, data[0..4]: [${grey.data.slice(0, 5).join(',')}]\n`;
+
+                                                            const thres = new CV.Image();
+                                                            CV.adaptiveThreshold(grey, thres, 2, 7);
+                                                            detectLog.innerHTML += `  Threshold: ${thres.width}x${thres.height}\n`;
+                                                            const nonzero = thres.data.filter(v => v > 0).length;
+                                                            const total = thres.data.length;
+                                                            detectLog.innerHTML += `  Non-zero pixels: ${nonzero}/${total} (${Math.round(nonzero / total * 100)}%)\n`;
+
+                                                            const binary = [];
+                                                            const contours = CV.findContours(thres, binary);
+                                                            detectLog.innerHTML += `  Contours found: ${contours.length}\n`;
+
+                                                            if (contours.length > 0) {
+                                                                      const minSize = 320 * 0.20;
+                                                                      const bigContours = contours.filter(c => c.length >= minSize);
+                                                                      detectLog.innerHTML += `  Contours >= minSize(${minSize}): ${bigContours.length}\n`;
+
+                                                                      bigContours.forEach((c, ci) => {
+                                                                                const poly = CV.approxPolyDP(c, c.length * 0.05);
+                                                                                const convex = CV.isContourConvex(poly);
+                                                                                const minEdge = poly.length === 4 ? CV.minEdgeLength(poly) : 'N/A';
+                                                                                detectLog.innerHTML += `  Contour[${ci}]: len=${c.length}, poly=${poly.length}pts, convex=${convex}, minEdge=${minEdge}\n`;
+                                                                      });
+                                                            }
+                                                  } else {
+                                                            markers.forEach(m => {
+                                                                      detectLog.innerHTML += `<span class="ok">  ✓ Marker ID=${m.id}, corners: ${m.corners.map(c => `(${Math.round(c.x)},${Math.round(c.y)})`).join(' ')}</span>\n`;
+                                                            });
+                                                  }
+
+                                                  detectLog.innerHTML += `\n<span class="${markers.length > 0 ? 'ok' : 'err'}">TEST 2: ${markers.length > 0 ? 'DETECTION WORKS ✅' : 'DETECTION FAILED ❌'}</span>\n`;
+
+                                        } catch (e) {
+                                                  detectLog.innerHTML += `<span class="err">ERROR: ${e.message}\n${e.stack}</span>\n`;
+                                        }
+                              }
+
+                              setTimeout(runStaticDetection, 100);
+
+                              // ========================================
+                              // TEST 3: Camera detection
+                              // ========================================
+                              let stream = null;
+                              let animFrame = null;
+                              let frameCounter = 0;
+                              let cameraDetector = null;
+                              const cameraLog = document.getElementById('cameraLog');
+
+                              window.startCamera = async function () {
+                                        const video = document.getElementById('videoInput');
+                                        const canvas = document.getElementById('cameraCanvas');
+                                        const ctx = canvas.getContext('2d');
+                                        cameraDetector = new AR.Detector();
+
+                                        try {
+                                                  stream = await navigator.mediaDevices.getUserMedia({
+                                                            video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+                                                  });
+                                                  video.srcObject = stream;
+                                                  await video.play();
+                                                  cameraLog.innerHTML += '<span class="ok">Camera started ✓</span>\n';
+
+                                                  video.addEventListener('loadedmetadata', () => {
+                                                            canvas.width = video.videoWidth;
+                                                            canvas.height = video.videoHeight;
+                                                            cameraLog.innerHTML += `Resolution: ${canvas.width}x${canvas.height}\n`;
+                                                            tick();
+                                                  });
+                                        } catch (e) {
+                                                  cameraLog.innerHTML += `<span class="err">Camera error: ${e.message}</span>\n`;
+                                        }
+
+                                        function tick() {
+                                                  const video = document.getElementById('videoInput');
+                                                  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                                                            canvas.width = video.videoWidth;
+                                                            canvas.height = video.videoHeight;
+                                                            ctx.drawImage(video, 0, 0);
+                                                            frameCounter++;
+
+                                                            try {
+                                                                      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                                                      const markers = cameraDetector.detect(imageData);
+
+                                                                      document.getElementById('frameCount').textContent = frameCounter;
+                                                                      document.getElementById('markerCount').textContent = markers.length;
+
+                                                                      if (markers.length > 0) {
+                                                                                const ids = markers.map(m => m.id).join(', ');
+                                                                                document.getElementById('markerIds').textContent = ids;
+
+                                                                                markers.forEach(m => {
+                                                                                          // Draw green box
+                                                                                          ctx.strokeStyle = '#00ff00';
+                                                                                          ctx.lineWidth = 3;
+                                                                                          ctx.beginPath();
+                                                                                          ctx.moveTo(m.corners[0].x, m.corners[0].y);
+                                                                                          for (let i = 1; i < 4; i++) ctx.lineTo(m.corners[i].x, m.corners[i].y);
+                                                                                          ctx.closePath();
+                                                                                          ctx.stroke();
+
+                                                                                          // Label
+                                                                                          ctx.fillStyle = '#00ff00';
+                                                                                          ctx.font = 'bold 18px Arial';
+                                                                                          ctx.fillText(`ID: ${m.id}`, m.corners[0].x, m.corners[0].y - 8);
+                                                                                });
+
+                                                                                if (frameCounter % 30 === 0) {
+                                                                                          cameraLog.innerHTML += `<span class="ok">Frame ${frameCounter}: Found ${markers.length} marker(s): [${ids}]</span>\n`;
+                                                                                          cameraLog.scrollTop = cameraLog.scrollHeight;
+                                                                                }
+                                                                      }
+                                                            } catch (e) {
+                                                                      if (frameCounter % 60 === 0) {
+                                                                                cameraLog.innerHTML += `<span class="err">Detection error at frame ${frameCounter}: ${e.message}</span>\n`;
+                                                                      }
+                                                            }
+                                                  }
+                                                  animFrame = requestAnimationFrame(tick);
+                                        }
+                              };
+
+                              window.stopCamera = function () {
+                                        if (stream) stream.getTracks().forEach(t => t.stop());
+                                        if (animFrame) cancelAnimationFrame(animFrame);
+                                        cameraLog.innerHTML += 'Camera stopped.\n';
+                              };
+
+                    })();
+          </script>
+</body>
+
+</html>

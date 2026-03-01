@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="uz">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L-Lab Smart Doska - Jonli O'yin</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Supabase & Plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+
+            --opt-a: #ef4444;
+            --opt-b: #3b82f6;
+            --opt-c: #f59e0b;
+            --opt-d: #10b981;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            background-image:
+                radial-gradient(at 10% 10%, rgba(59, 130, 246, 0.2) 0px, transparent 50%),
+                radial-gradient(at 90% 90%, rgba(139, 92, 246, 0.2) 0px, transparent 50%);
+            color: var(--text-light);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+
+        .top-bar .title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .top-bar .status {
+            font-size: 1.1rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+        }
+
+        /* Screens */
+        .screen {
+            display: none;
+            flex: 1;
+            padding: 2rem;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- LOBBY SCREEN --- */
+        .lobby-title {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 2rem;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .students-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .student-card {
+            background: var(--bg-card);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px);
+        }
+
+        .student-card.joined {
+            border-color: var(--success);
+            color: white;
+            background: rgba(16, 185, 129, 0.2);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+            transform: scale(1.05);
+        }
+
+        /* --- QUESTION SCREEN --- */
+        .question-container {
+            width: 100%;
+            max-width: 1400px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .question-text {
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            background: var(--bg-card);
+            padding: 3rem;
+            border-radius: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            line-height: 1.3;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .option-btn {
+            padding: 2rem;
+            font-size: 2rem;
+            font-weight: 700;
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .option-btn.opt-0 {
+            border-color: var(--opt-a);
+            color: var(--opt-a);
+        }
+
+        .option-btn.opt-1 {
+            border-color: var(--opt-b);
+            color: var(--opt-b);
+        }
+
+        .option-btn.opt-2 {
+            border-color: var(--opt-c);
+            color: var(--opt-c);
+        }
+
+        .option-btn.opt-3 {
+            border-color: var(--opt-d);
+            color: var(--opt-d);
+        }
+
+        .option-btn .badge {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .option-btn.opt-0 .badge {
+            background: var(--opt-a);
+        }
+
+        .option-btn.opt-1 .badge {
+            background: var(--opt-b);
+        }
+
+        .option-btn.opt-2 .badge {
+            background: var(--opt-c);
+        }
+
+        .option-btn.opt-3 .badge {
+            background: var(--opt-d);
+        }
+
+        .timer-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .timer-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+            transform-origin: left;
+            transition: transform 1s linear;
+        }
+
+        /* --- LEADERBOARD SCREEN --- */
+        .leaderboard-container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            gap: 3rem;
+            height: 80vh;
+        }
+
+        .rankings-col {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            padding-right: 1rem;
+        }
+
+        /* Hide scrollbar */
+        .rankings-col::-webkit-scrollbar {
+            width: 0;
+        }
+
+        .rank-card {
+            display: flex;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 1.5rem 2rem;
+            border-radius: 1.2rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            gap: 1.5rem;
+        }
+
+        .rank-number {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rank-card:nth-child(1) .rank-number {
+            background: #fbbf24;
+            color: #000;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+        }
+
+        .rank-card:nth-child(2) .rank-number {
+            background: #94a3b8;
+            color: #000;
+        }
+
+        .rank-card:nth-child(3) .rank-number {
+            background: #b45309;
+            color: #fff;
+        }
+
+        .rank-name {
+            flex: 1;
+        }
+
+        .rank-score {
+            color: var(--primary);
+        }
+
+        /* Viral Code Box */
+        .viral-col {
+            flex: 1;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 2rem;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+            }
+
+            100% {
+                box-shadow: 0 0 60px rgba(139, 92, 246, 0.5);
+            }
+        }
+
+        .viral-col h3 {
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            color: #fff;
+        }
+
+        .viral-col p {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .qr-container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        #viral-qrcode {
+            width: 200px;
+            height: 200px;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            z-index: 100;
+        }
+
+        /* Floating answer indicators */
+        .student-floater {
+            position: absolute;
+            background: var(--bg-card);
+            border: 2px solid var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            opacity: 0;
+            z-index: 50;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(20px) scale(0.8);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-50px) scale(1.2);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Load Supabase Config -->
+    <script src="../miniapp/supabaseConfig.js"></script>
+
+    <div id="loading"><i class="fa-solid fa-spinner fa-spin"></i> &nbsp; Yuklanmoqda...</div>
+
+    <div class="top-bar">
+        <div class="title" id="test-title-display">L-Lab Smart Doska</div>
+        <div class="status" id="connection-status"><i class="fa-solid fa-wifi text-muted"></i> Kutilyapti</div>
+    </div>
+
+    <!-- LOBBY SCREEN -->
+    <div id="screen-lobby" class="screen">
+        <div class="lobby-title">O'quvchilar kutilmoqda...</div>
+        <div class="students-grid" id="lobby-grid">
+            <!-- Populated via JS -->
+        </div>
+    </div>
+
+    <!-- QUESTION SCREEN -->
+    <div id="screen-question" class="screen">
+        <div class="question-container">
+            <div class="question-text" id="question-text">Savol matni bu yerda fozil bo'ladi...</div>
+            <div class="options-grid" id="options-grid">
+                <!-- Populated via JS -->
+            </div>
+            <div class="timer-bar">
+                <div class="timer-fill" id="timer-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEADERBOARD SCREEN -->
+    <div id="screen-leaderboard" class="screen">
+        <div class="lobby-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-trophy" style="color:#fbbf24;"></i>
+            Natijalar</div>
+        <div class="leaderboard-container">
+            <div class="rankings-col" id="rankings-list">
+                <!-- Populated via JS -->
+            </div>
+            <div class="viral-col">
+                <h3>Zo'r test ekanmi? 😍</h3>
+                <p>Ushbu QR kodni skaner qiling va testni o'z botingizga nusxalab oling!</p>
+                <div class="qr-container">
+                    <canvas id="viral-qrcode"></canvas>
+                </div>
+                <p style="font-size: 0.9rem; margin-bottom:0;">@SmartTester_Bot (L-Lab)</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const testId = urlParams.get('test_id');
+        const classId = urlParams.get('class_id');
+
+        let testData = null;
+        let questions = [];
+        let students = []; // Map of id -> student obj
+        let remoteMap = {}; // Map of remote_id -> student_id
+
+        let currentQuestionIndex = -1;
+        let studentScores = {}; // student_id -> score
+        let studentAnswersCurrent = {}; // Track who answered current question to prevent double voting
+
+        let questionStartTime = 0;
+        let timerInterval = null;
+        const totalTimeMs = 30000; // Default 30s per question
+
+        // --- DOM ELEMENTS ---
+        const screens = {
+            lobby: document.getElementById('screen-lobby'),
+            question: document.getElementById('screen-question'),
+            leaderboard: document.getElementById('screen-leaderboard')
+        };
+        const loadingStr = document.getElementById('loading');
+
+        // --- INITIALIZATION ---
+        async function init() {
+            if (!testId || !classId) {
+                loadingStr.innerHTML = '<span style="color:var(--danger)">Xatolik: URL da test_id yoki class_id yo\'q.</span>';
+                return;
+            }
+
+            try {
+                // 1. Fetch Class/Students
+                const { data: stdData, error: stdErr } = await supabaseClient
+                    .from('bot_students')
+                    .select('*')
+                    .eq('class_id', classId)
+                    .order('full_name');
+                if (stdErr) throw stdErr;
+
+                stdData.forEach(s => {
+                    students[s.id] = s;
+                    studentScores[s.id] = 0;
+                    if (s.remote_id) {
+                        remoteMap[s.remote_id] = s.id;
+                    }
+                });
+
+                // 2. Fetch Test
+                const { data: tData, error: tErr } = await supabaseClient
+                    .from('bot_tests')
+                    .select('*')
+                    .eq('id', testId)
+                    .single();
+                if (tErr) throw tErr;
+                testData = tData;
+                document.getElementById('test-title-display').innerText = tData.title;
+
+                // 3. Fetch Questions
+                const { data: qData, error: qErr } = await supabaseClient
+                    .from('bot_questions')
+                    .select('*')
+                    .eq('test_id', testId)
+                    .order('id');
+                if (qErr) throw qErr;
+
+                // 4. Fetch Options
+                const qIds = qData.map(q => q.id);
+                const { data: optData, error: optErr } = await supabaseClient
+                    .from('bot_options')
+                    .select('*')
+                    .in('question_id', qIds);
+                if (optErr) throw optErr;
+
+                // Combine Q&A
+                questions = qData.map(q => {
+                    return {
+                        ...q,
+                        options: optData.filter(o => o.question_id === q.id).sort((a, b) => a.id - b.id)
+                    };
+                });
+
+                // 5. Setup viral QR Code
+                const botUsername = "roziyevbehroz_bot"; // Change this statically or fetch dynamically if possible, hardcoding is fine for demo
+                const inviteLink = `https://t.me/${botUsername}?start=share_test_${testId}`;
+                QRCode.toCanvas(document.getElementById('viral-qrcode'), inviteLink, { width: 200, margin: 1 });
+
+                // 6. Init UI
+                renderLobby();
+                showScreen('lobby');
+                loadingStr.style.display = 'none';
+
+                // 7. Subscribe to Realtime
+                setupRealtime();
+
+            } catch (err) {
+                console.error(err);
+                loadingStr.innerHTML = `<span style="color:var(--danger)">Xatolik: ${err.message}</span>`;
+            }
+        }
+
+        // --- REALTIME SYNC (Teacher Remote -> Display) ---
+        function setupRealtime() {
+            const channelName = `session-${testId}-${classId}`;
+            const channel = supabaseClient.channel(channelName);
+
+            channel.on('broadcast', { event: 'control' }, (payload) => {
+                const action = payload.payload.action;
+                console.log("Teacher action:", action);
+
+                if (action === 'next_question') {
+                    nextQuestion();
+                } else if (action === 'prev_question') {
+                    prevQuestion();
+                } else if (action === 'finish') {
+                    showLeaderboard();
+                }
+            });
+
+            // Listen for raw remote signals forwarded by remote.html
+            channel.on('broadcast', { event: 'remote_signal' }, (payload) => {
+                const { remote_id, student_id, key } = payload.payload;
+                handleRemoteSignal(remote_id, student_id, key);
+            });
+
+            channel.subscribe((status) => {
+                const badge = document.getElementById('connection-status');
+                if (status === 'SUBSCRIBED') {
+                    badge.innerHTML = '<i class="fa-solid fa-wifi" style="color:var(--success)"></i> Jonli ulanish faol';
+                } else {
+                    badge.innerHTML = '<i class="fa-solid fa-wifi text-muted"></i> Aloqa izlanmoqda...';
+                }
+            });
+        }
+
+        function handleRemoteSignal(remote_id, override_student_id, key) {
+            let studentId = override_student_id;
+
+            // If it came from an Arduino, map it via the remote_id
+            if (!studentId && remote_id) {
+                studentId = remoteMap[remote_id];
+            }
+
+            if (!studentId || !students[studentId]) return; // Unknown remote or student
+
+            const st = students[studentId];
+
+            // If in Lobby, light up their card
+            if (screens.lobby.classList.contains('active')) {
+                const card = document.getElementById('lobby-card-' + studentId);
+                if (card && !card.classList.contains('joined')) {
+                    card.classList.add('joined');
+                    card.innerHTML += ' <i class="fa-solid fa-check-circle" style="color:var(--success)"></i>';
+                }
+                return;
+            }
+
+            // If in Question, record answer
+            if (screens.question.classList.contains('active')) {
+                // Prevent double answering per question
+                if (studentAnswersCurrent[studentId]) return;
+
+                const q = questions[currentQuestionIndex];
+                if (!q) return;
+
+                // Map 'A', 'B', 'C', 'D' directly to index 0,1,2,3
+                const keyMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+                const optIndex = keyMap[key.toUpperCase()];
+
+                if (optIndex !== undefined && q.options[optIndex]) {
+                    studentAnswersCurrent[studentId] = true;
+
+                    // Show floating visual indicator
+                    showFloater(st.full_name);
+
+                    // Check if correct
+                    if (q.options[optIndex].is_correct) {
+                        // Calculate score: max 1000, drops linearly based on time taken
+                        const timeElapsed = Date.now() - questionStartTime;
+                        let points = Math.max(10, 1000 - Math.floor((timeElapsed / totalTimeMs) * 1000));
+                        studentScores[studentId] += points;
+                    }
+                }
+            }
+        }
+
+        function showFloater(name) {
+            const el = document.createElement('div');
+            el.className = 'student-floater';
+            el.innerText = `${name} javob berdi!`;
+            // Random position in bottom area
+            el.style.bottom = (20 + Math.random() * 20) + '%';
+            el.style.left = (30 + Math.random() * 40) + '%';
+
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // --- UI RENDERING ---
+        function showScreen(name) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[name].classList.add('active');
+
+            if (name !== 'question') {
+                clearInterval(timerInterval);
+            }
+        }
+
+        function renderLobby() {
+            const grid = document.getElementById('lobby-grid');
+            let html = '';
+            Object.values(students).forEach(st => {
+                html += `<div class="student-card" id="lobby-card-${st.id}">${st.full_name}</div>`;
+            });
+            grid.innerHTML = html;
+        }
+
+        // --- QUESTION LOGIC ---
+        function nextQuestion() {
+            if (currentQuestionIndex + 1 >= questions.length) {
+                showLeaderboard();
+                return;
+            }
+            currentQuestionIndex++;
+            renderQuestion();
+        }
+
+        function prevQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                renderQuestion();
+            }
+        }
+
+        function renderQuestion() {
+            showScreen('question');
+            studentAnswersCurrent = {}; // reset for this question
+            const q = questions[currentQuestionIndex];
+
+            document.getElementById('question-text').innerText = `${currentQuestionIndex + 1}. ${q.text}`;
+
+            let optsHtml = '';
+            const labels = ['A', 'B', 'C', 'D'];
+            q.options.forEach((opt, idx) => {
+                optsHtml += `
+                    <div class="option-btn opt-${idx}">
+                        <div class="badge">${labels[idx]}</div>
+                        ${opt.text}
+                    </div>
+                `;
+            });
+            document.getElementById('options-grid').innerHTML = optsHtml;
+
+            // Start Timer
+            questionStartTime = Date.now();
+            const fill = document.getElementById('timer-fill');
+            fill.style.transform = 'scaleX(1)';
+            fill.style.transition = 'none';
+
+            setTimeout(() => {
+                fill.style.transition = `transform ${totalTimeMs}ms linear`;
+                fill.style.transform = 'scaleX(0)';
+            }, 50);
+
+            clearInterval(timerInterval);
+            timerInterval = setTimeout(() => {
+                // Time's up (could highlight correct answer here if desired, but teacher moves next manually)
+                fill.style.transform = 'scaleX(0)';
+            }, totalTimeMs);
+        }
+
+        // --- LEADERBOARD LOGIC ---
+        function showLeaderboard() {
+            showScreen('leaderboard');
+
+            // Sort students by score
+            const sorted = Object.values(students).sort((a, b) => studentScores[b.id] - studentScores[a.id]);
+
+            let html = '';
+            sorted.forEach((st, idx) => {
+                if (studentScores[st.id] === 0 && idx > 4) return; // Hide zeros if not in top 5
+
+                html += `
+                    <div class="rank-card">
+                        <div class="rank-number">${idx + 1}</div>
+                        <div class="rank-name">${st.full_name}</div>
+                        <div class="rank-score">${studentScores[st.id]} ball</div>
+                    </div>
+                `;
+            });
+            document.getElementById('rankings-list').innerHTML = html;
+
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // Boot
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+
+</html>
